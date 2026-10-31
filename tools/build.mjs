@@ -26,3 +26,10 @@ const html = tpl
 await writeFile(new URL('docs/index.html', root), html);
 
 console.log(`recorder.min.js: ${code.length} B, bookmarklet: ${bookmarklet.length} B`);
+
+// Та сама сторінка для claude.ai Artifact (без власного <html>/<head>, з темами)
+const art = await readFile(new URL('tools/install.artifact.html', root), 'utf8');
+await writeFile(new URL('dist/install.artifact.html', root), art
+  .replaceAll('{{VERSION}}', pkg.version)
+  .replaceAll('{{SIZE_KB}}', (bookmarklet.length / 1024).toFixed(1))
+  .replace('{{BOOKMARKLET_JSON}}', JSON.stringify(bookmarklet).replace(/</g, '\\u003c')));

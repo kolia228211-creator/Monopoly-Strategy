@@ -1,0 +1,106 @@
+<title>RichUp Записувач</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=Manrope:wght@400;600;700&family=JetBrains+Mono&display=swap">
+<style>
+  /* Layout: одна вузька колонка-інструкція, як картка правил гри; кроки — справжня послідовність */
+  :root {
+    --bg: #f6f3fb; --surface: #ffffff; --ink: #1d1830; --muted: #6a6386; --line: #e3ddf0;
+    --accent: #5b47d6; --accent-ink: #ffffff; --chip: #ece7fa; --ok: #1f8f5f; --warn-bg: #fff4dc; --warn-ink: #7a5300;
+    --code-bg: #f0edf8; --code-ink: #4b4470;
+    --f-display: "Unbounded", "Arial Black", system-ui, sans-serif;
+    --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #14111f; --surface: #1f1a33; --ink: #ece9f6; --muted: #a59fc2; --line: #2f2850;
+    --accent: #7c6af0; --accent-ink: #ffffff; --chip: #2c2550; --ok: #4cc38a; --warn-bg: #3a2f12; --warn-ink: #ffd27a;
+    --code-bg: #0e0c17; --code-ink: #9d96c0; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #14111f; --surface: #1f1a33; --ink: #ece9f6; --muted: #a59fc2; --line: #2f2850;
+    --accent: #7c6af0; --accent-ink: #ffffff; --chip: #2c2550; --ok: #4cc38a; --warn-bg: #3a2f12; --warn-ink: #ffd27a;
+    --code-bg: #0e0c17; --code-ink: #9d96c0; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--f-body);
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
+  main { max-width: 640px; margin: 0 auto; display: grid; gap: 14px; }
+  header { display: grid; gap: 6px; padding-block: 6px 4px; }
+  .dice { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  h1 { font: 700 26px/1.15 var(--f-display); margin: 0; text-wrap: balance; }
+  .lead { color: var(--muted); margin: 0; max-width: 60ch; }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+  h2 { font: 600 16px/1.3 var(--f-display); margin: 0; display: flex; gap: 10px; align-items: center; }
+  .n { flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--chip); color: var(--accent); display: grid; place-items: center; font: 700 14px var(--f-display); }
+  ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+  .k { background: var(--chip); border-radius: 6px; padding: 1px 7px; font-weight: 600; white-space: nowrap; }
+  code { font-family: var(--f-mono); background: var(--chip); border-radius: 6px; padding: 1px 6px; font-size: 14px; }
+  button { font: 700 16px var(--f-body); background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 13px 16px; width: 100%; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  button.ok { background: var(--ok); }
+  textarea { width: 100%; height: 88px; background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--line); border-radius: 8px; font: 11px/1.3 var(--f-mono); padding: 8px; resize: vertical; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0; font-variant-numeric: tabular-nums; }
+  .warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 0; }
+  a { color: var(--accent); }
+  p { margin: 0; }
+</style>
+
+<main>
+  <header>
+    <span class="dice">Monopoly-Strategy · крок 1 з 5 · v{{VERSION}}</span>
+    <h1>Записувач гри richup.io</h1>
+    <p class="lead">Записує одну партію, щоб помічник навчився розуміти сайт. Нічого не натискає в грі, токени й паролі маскуються, файл лишається в тебе.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>Скопіюй код</h2>
+    <button id="copy" type="button">Скопіювати код записувача</button>
+    <textarea id="code" readonly aria-label="Код закладки"></textarea>
+    <p class="meta">Розмір: {{SIZE_KB}} КБ. Якщо кнопка не спрацювала, утримуй палець у полі вище → «Вибрати все» → «Копіювати».</p>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Створи закладку в Chrome</h2>
+    <ol>
+      <li>Відкрий будь-яку сторінку в Chrome → <span class="k">⋮</span> → <span class="k">☆</span>, щоб додати закладку.</li>
+      <li>Відкрий <span class="k">⋮ → Закладки</span>, утримуй щойно додану закладку → <b>Змінити</b>.</li>
+      <li>Назва: <code>RU</code>. Поле <b>URL</b> очисти повністю, встав скопійований код і збережи.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Запиши партію</h2>
+    <ol>
+      <li>Зайди в кімнату на richup.io, бажано ще до натискання «Start Game».</li>
+      <li>Торкнися адресного рядка, набери <code>RU</code> і вибери закладку із зірочкою, а не пошук Google.</li>
+      <li>Унизу ліворуч з'явиться панелька <b>● REC</b>. Грай як зазвичай. Найкорисніше, щоб у партії були купівля, аукціон, обмін, будинки, іпотека й тюрма.</li>
+      <li>Наприкінці натисни 💾, щоб зберегти файл, або 📤, щоб поділитися ним. Надішли файл у чат Claude.</li>
+    </ol>
+    <p class="warn">Не оновлюй сторінку під час запису: дані живуть до перезавантаження. Якщо панелька зникла, просто запусти закладку ще раз.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>На комп'ютері</h2>
+    <p>Те саме: створи закладку з назвою <code>RU</code>, встав код у поле адреси й натискай її на сторінці гри.</p>
+  </section>
+
+  <p class="meta">Відкритий код: <a href="https://github.com/kolia228211-creator/Monopoly-Strategy" target="_blank" rel="noopener">github.com/kolia228211-creator/Monopoly-Strategy</a></p>
+</main>
+
+<script>
+  var BM = {{BOOKMARKLET_JSON}};
+  var ta = document.getElementById('code');
+  ta.value = BM;
+  var btn = document.getElementById('copy');
+  var label = btn.textContent;
+  function done() { btn.textContent = 'Скопійовано'; btn.className = 'ok'; setTimeout(function () { btn.textContent = label; btn.className = ''; }, 2500); }
+  function fallback() {
+    ta.focus(); ta.select(); ta.setSelectionRange(0, BM.length);
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    if (ok) done(); else { btn.textContent = 'Код виділено, скопіюй вручну'; }
+  }
+  btn.addEventListener('click', function () {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(BM).then(done, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+  });
+</script>
