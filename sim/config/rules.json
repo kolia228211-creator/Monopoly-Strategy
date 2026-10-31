@@ -1,0 +1,371 @@
+{
+ "_comment": "Усі правила симулятора. status: exact = з налаштувань/скрінів користувача; placeholder = заглушка (класична Монополія). Змініть цифри й запустіть: python3 sim/run_all.py",
+ "boardFile": "data/board-classic.json",
+ "status": {
+  "board_layout_prices": "exact",
+  "settings": "exact",
+  "streetRents": "placeholder",
+  "housePrice": "placeholder",
+  "airportRent": "placeholder",
+  "utilityMultipliers": "placeholder",
+  "cards": "placeholder",
+  "startBonus": "placeholder",
+  "prison": "placeholder",
+  "earningsTax": "placeholder (10% від готівки)",
+  "houseLimit": "placeholder",
+  "mortgage": "exact (50%)",
+  "unmortgage": "placeholder",
+  "doubleRentOnFullSet": "unknown -> рахуємо обидва"
+ },
+ "startingCash": 1500,
+ "passStartBonus": 200,
+ "landStartBonus": 300,
+ "doubleRentOnFullSet": true,
+ "auction": true,
+ "vacationCash": true,
+ "rentInPrison": true,
+ "evenBuild": true,
+ "mortgageRate": 0.5,
+ "unmortgageRate": 0.55,
+ "houseSellRate": 0.5,
+ "houseLimit": 32,
+ "hotelLimit": 12,
+ "earningsTaxPercent": 10,
+ "premiumTax": 75,
+ "prison": {
+  "fine": 50,
+  "maxTurns": 3,
+  "threeDoublesToPrison": true
+ },
+ "housePrice": {
+  "brazil": 50,
+  "israel": 50,
+  "italy": 100,
+  "germany": 100,
+  "china": 150,
+  "france": 150,
+  "uk": 200,
+  "usa": 200
+ },
+ "streetRents": {
+  "1": [
+   2,
+   10,
+   30,
+   90,
+   160,
+   250
+  ],
+  "3": [
+   4,
+   20,
+   60,
+   180,
+   320,
+   450
+  ],
+  "6": [
+   6,
+   30,
+   90,
+   270,
+   400,
+   550
+  ],
+  "7": [
+   7,
+   33,
+   99,
+   297,
+   440,
+   605
+  ],
+  "9": [
+   8,
+   40,
+   100,
+   300,
+   450,
+   600
+  ],
+  "11": [
+   9,
+   46,
+   139,
+   418,
+   580,
+   696
+  ],
+  "13": [
+   10,
+   50,
+   150,
+   450,
+   625,
+   750
+  ],
+  "14": [
+   12,
+   60,
+   180,
+   500,
+   700,
+   900
+  ],
+  "16": [
+   14,
+   70,
+   200,
+   550,
+   750,
+   950
+  ],
+  "18": [
+   15,
+   74,
+   211,
+   581,
+   792,
+   1003
+  ],
+  "19": [
+   16,
+   80,
+   220,
+   600,
+   800,
+   1000
+  ],
+  "21": [
+   17,
+   86,
+   239,
+   668,
+   835,
+   1002
+  ],
+  "23": [
+   18,
+   90,
+   250,
+   700,
+   875,
+   1050
+  ],
+  "24": [
+   20,
+   100,
+   300,
+   750,
+   925,
+   1100
+  ],
+  "26": [
+   22,
+   110,
+   330,
+   800,
+   975,
+   1150
+  ],
+  "28": [
+   23,
+   114,
+   343,
+   831,
+   1013,
+   1194
+  ],
+  "29": [
+   24,
+   120,
+   360,
+   850,
+   1025,
+   1200
+  ],
+  "31": [
+   25,
+   126,
+   377,
+   870,
+   1063,
+   1232
+  ],
+  "32": [
+   26,
+   130,
+   390,
+   900,
+   1100,
+   1275
+  ],
+  "34": [
+   28,
+   150,
+   450,
+   1000,
+   1200,
+   1400
+  ],
+  "37": [
+   36,
+   180,
+   514,
+   1131,
+   1337,
+   1543
+  ],
+  "39": [
+   50,
+   200,
+   600,
+   1400,
+   1700,
+   2000
+  ]
+ },
+ "airportRent": [
+  25,
+  50,
+  100,
+  200
+ ],
+ "utilityMultipliers": [
+  4,
+  10
+ ],
+ "maxRounds": 400,
+ "cards": {
+  "surprise": [
+   {
+    "t": "move",
+    "to": 0
+   },
+   {
+    "t": "move",
+    "to": 24
+   },
+   {
+    "t": "move",
+    "to": 11
+   },
+   {
+    "t": "nearest",
+    "kind": "utility"
+   },
+   {
+    "t": "nearest",
+    "kind": "airport"
+   },
+   {
+    "t": "nearest",
+    "kind": "airport"
+   },
+   {
+    "t": "money",
+    "amount": 50
+   },
+   {
+    "t": "jailfree"
+   },
+   {
+    "t": "back",
+    "steps": 3
+   },
+   {
+    "t": "jail"
+   },
+   {
+    "t": "repairs",
+    "house": 25,
+    "hotel": 100
+   },
+   {
+    "t": "money",
+    "amount": -15
+   },
+   {
+    "t": "move",
+    "to": 5
+   },
+   {
+    "t": "move",
+    "to": 39
+   },
+   {
+    "t": "payeach",
+    "amount": 50
+   },
+   {
+    "t": "money",
+    "amount": 150
+   }
+  ],
+  "treasure": [
+   {
+    "t": "move",
+    "to": 0
+   },
+   {
+    "t": "money",
+    "amount": 200
+   },
+   {
+    "t": "money",
+    "amount": -50
+   },
+   {
+    "t": "money",
+    "amount": 50
+   },
+   {
+    "t": "jailfree"
+   },
+   {
+    "t": "jail"
+   },
+   {
+    "t": "money",
+    "amount": 100
+   },
+   {
+    "t": "money",
+    "amount": 20
+   },
+   {
+    "t": "collecteach",
+    "amount": 10
+   },
+   {
+    "t": "money",
+    "amount": 100
+   },
+   {
+    "t": "money",
+    "amount": -100
+   },
+   {
+    "t": "money",
+    "amount": -50
+   },
+   {
+    "t": "money",
+    "amount": 25
+   },
+   {
+    "t": "repairs",
+    "house": 40,
+    "hotel": 115
+   },
+   {
+    "t": "money",
+    "amount": 10
+   },
+   {
+    "t": "money",
+    "amount": 100
+   }
+  ]
+ }
+}

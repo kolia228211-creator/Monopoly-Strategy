@@ -1,0 +1,4 @@
+out/fig/
+out/*.png
+out/mc.log
+__pycache__/
