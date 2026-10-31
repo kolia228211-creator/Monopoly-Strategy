@@ -1,0 +1,15 @@
+{
+  "name": "monopoly-strategy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Помічник для richup.io: записувач гри, аналітика, підказки",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node tools/test-recorder.mjs"
+  },
+  "devDependencies": {
+    "terser": "^5.31.0",
+    "ws": "^8.18.0"
+  }
+}
