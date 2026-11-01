@@ -15,18 +15,23 @@ await build({
   outfile: new URL('dist/helper.js', root).pathname
 });
 
-const loader = `(function(){if(window.__RUHELP){window.__RUHELP.ui.show();return}var s=document.createElement('script');s.src='${CDN}?v='+Math.floor(Date.now()/36e5);s.onerror=function(){alert('Помічник: не вдалося завантажити '+s.src)};(document.head||document.documentElement).appendChild(s)})()`;
-await writeFile(new URL('dist/helper.bookmarklet.txt', root), 'javascript:' + encodeURIComponent(loader) + '\n');
+// Закладка = мініфікований завантажувач (найсвіжіший коміт з GitHub -> jsDelivr)
+const { transform } = await import('esbuild');
+const loaderSrc = await readFile(new URL('src/loader/loader.js', root), 'utf8');
+const loaderMin = (await transform(loaderSrc, { minify: true, target: 'es2015' })).code.trim().replace(/;$/, '');
+await writeFile(new URL('dist/helper.bookmarklet.txt', root), 'javascript:' + encodeURIComponent('void ' + loaderMin) + '\n');
 
-// Розширення Chrome (Manifest V3): той самий скрипт у "MAIN world" сторінки
+// Розширення Chrome (Manifest V3): завантажувач + локальна копія як запасний варіант
 await mkdir(new URL('extension/', root), { recursive: true });
 await copyFile(new URL('dist/helper.js', root), new URL('extension/helper.js', root));
+await writeFile(new URL('extension/loader.js', root), `var __FALLBACK__ = chrome.runtime.getURL('helper.js');\n` + loaderSrc);
 const manifest = {
   manifest_version: 3,
   name: 'RichUp Помічник',
   version: pkg.version,
   description: 'Поради в реальному часі для richup.io: купівля, аукціон, обміни, будинки, шанси на перемогу.',
-  content_scripts: [{ matches: ['https://richup.io/*'], js: ['helper.js'], world: 'MAIN', run_at: 'document_idle' }],
+  content_scripts: [{ matches: ['https://richup.io/*'], js: ['loader.js'], run_at: 'document_idle' }],
+  web_accessible_resources: [{ resources: ['helper.js'], matches: ['https://richup.io/*'] }],
   icons: { 128: 'icon128.png' }
 };
 await writeFile(new URL('extension/manifest.json', root), JSON.stringify(manifest, null, 2) + '\n');

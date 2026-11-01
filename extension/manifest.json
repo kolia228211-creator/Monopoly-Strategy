@@ -9,10 +9,19 @@
         "https://richup.io/*"
       ],
       "js": [
+        "loader.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
         "helper.js"
       ],
-      "world": "MAIN",
-      "run_at": "document_idle"
+      "matches": [
+        "https://richup.io/*"
+      ]
     }
   ],
   "icons": {
