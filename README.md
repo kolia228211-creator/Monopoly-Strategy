@@ -62,6 +62,25 @@ node tools/selfplay/questions.mjs tools/selfplay/out/best-dbl1.json   # експ
 python3 tools/selfplay/report.py                    # PDF
 ```
 
+### Арена (v0.5.1): незалежна перевірка і стійкі параметри
+
+`tools/selfplay/arena/` — другий, незалежний рушій: бот у ньому приймає рішення **тими самими формулами, що й помічник** (оцінка обміну через portfolio і правило «не віддавай ключову ділянку дешевше», безпечний запас кидка, план забудови), а людиноподібні боти мають власну логіку. Пошук лише в арені перенавчався під неї (у рушії evolve.mjs виходило гірше за v0.5.0), тому вбудовано **стійкий** варіант: sep-CMA-ES з фітнесом = середнє двох рушіїв. Перевірка на окремих seed, проти людиноподібних (3/4/5/6 гравців):
+
+| | v0.4 | v0.5.0 | v0.5.1 |
+|---|---|---|---|
+| x2 OFF | 38/37/35/31% | 44/43/41/37% | **56/51/46/42%** |
+| x2 ON | 39/37/35/31% | 47/47/45/40% | **49/45/44/41%** |
+
+У рушії evolve.mjs v0.5.1 не гірша за v0.5.0 (x2 OFF на рівні, x2 ON 1.34 → 1.49 відносно чесної частки). Звіт: `tools/selfplay/out/arena-report.pdf`.
+
+```bash
+npm run arena -- --dbl 1 --gens 32 --games 1200          # стійкий пошук (два рушії)
+node tools/selfplay/arena/validate.mjs --games 24000      # було → стало + перехресна перевірка
+node tools/selfplay/arena/experiments.mjs --games 8000    # відкриті питання
+node tools/selfplay/arena/embed.mjs                       # вписати в src/helper/params.js
+python3 tools/selfplay/arena/report.py                    # PDF
+```
+
 ## Як це працює
 
 - Стан гри береться з клієнтського Zustand-сховища richup (див. [`docs/PROTOCOL.md`](docs/PROTOCOL.md)).

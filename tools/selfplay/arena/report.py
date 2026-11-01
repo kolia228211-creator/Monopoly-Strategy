@@ -143,7 +143,6 @@ if exp:
         story.append(Spacer(1, 4))
     for t in fnd.get('questions', []): story.append(Paragraph(t, B, bulletText='•'))
 
-story.append(PageBreak())
 story.append(Paragraph('Правила для гри з друзями', H2))
 for i, t in enumerate(fnd.get('rules', []), 1): story.append(Paragraph(t, B, bulletText=f'{i}.'))
 
