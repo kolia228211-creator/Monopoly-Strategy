@@ -6,14 +6,17 @@ import {
 } from './rules.js';
 import { boardProbs, DICE } from './probability.js';
 import { nextRoll, deckInfo, cardKind, cardText } from './roll.js';
+import { paramsFor, TUNED } from './params.js';
 
-export const HORIZON = 25;   // скільки ходів кожного суперника враховуємо для окупності
+export const HORIZON = 25;   // за замовчуванням; фактичне значення — params.H (self-play)
+const PR = (s) => paramsFor(s);
 
 export function stage(s) {
   let u = 0, t = 0;
   s.blocks.forEach((b) => { if (isBuyable(b)) { t++; if (!b.ownerId) u++; } });
   const share = t ? u / t : 0;
-  return { unownedShare: share, mult: share > 0.6 ? 1.15 : share > 0.25 ? 1 : 0.8, name: share > 0.6 ? 'рання' : share > 0.25 ? 'середина' : 'пізня' };
+  const pr = PR(s);
+  return { unownedShare: share, mult: share > 0.6 ? pr.stageEarly : share > 0.25 ? 1 : pr.stageLate, name: share > 0.6 ? 'рання' : share > 0.25 ? 'середина' : 'пізня' };
 }
 
 const nOpp = (s) => Math.max(1, (s.phase === 'lobby' ? Math.max(alivePlayers(s).length, s.settings?.maxPlayers || 4) : alivePlayers(s).length) - 1);
@@ -25,7 +28,7 @@ export function groupIncome(s, key, L, P = boardProbs(s).leave) {
 }
 export function groupT(s, key, P) {
   const idx = groupIndices(s, key), hp = s.blocks[idx[0]]?.housePrice || 0;
-  return nOpp(s) * HORIZON * groupIncome(s, key, 3, P) - 3 * hp * idx.length;
+  return nOpp(s) * PR(s).H * groupIncome(s, key, 3, P) - 3 * hp * idx.length;
 }
 
 // Цінність ділянки i для гравця pid (у $)
@@ -36,17 +39,18 @@ export function valueOf(s, i, pid, P = boardProbs(s).leave) {
     const g = groupIndices(s, b.countryId), others = g.filter((j) => j !== i);
     const mine = others.filter((j) => s.blocks[j].ownerId === pid).length;
     const T = Math.max(0, groupT(s, b.countryId, P));
-    if (mine === others.length) { v += 0.5 * T; why.push('завершує твій набір ' + groupName(b.countryId)); }
-    else if (mine > 0 && others.every((j) => !s.blocks[j].ownerId || s.blocks[j].ownerId === pid)) { v += 0.15 * T * (mine + 1) / g.length; why.push('крок до набору ' + groupName(b.countryId)); }
+    const pr = PR(s);
+    if (mine === others.length) { v += pr.complete * T; why.push('завершує твій набір ' + groupName(b.countryId)); }
+    else if (mine > 0 && others.every((j) => !s.blocks[j].ownerId || s.blocks[j].ownerId === pid)) { v += pr.step * T * (mine + 1) / g.length; why.push('крок до набору ' + groupName(b.countryId)); }
     const opp = others.map((j) => s.blocks[j].ownerId);
     if (opp.length && opp.every((o) => o && o !== pid && o === opp[0])) {
-      v += 0.35 * HORIZON * groupIncome(s, b.countryId, 3, P); why.push('блокує набір суперника');
+      v += pr.block * pr.H * groupIncome(s, b.countryId, 3, P); why.push('блокує набір суперника');
     }
   } else if (b.type === 'airport' || b.type === 'company') {
     const k = s.blocks.filter((x, j) => j !== i && x.type === b.type && x.ownerId === pid).length;
     const pAvg = s.blocks.reduce((a, x, j) => a + (x.type === b.type ? P[j] : 0), 0) / Math.max(1, s.blocks.filter((x) => x.type === b.type).length);
     const r = (n) => b.type === 'airport' ? ((Array.isArray(b.rentPrices) ? b.rentPrices : [25, 50, 100, 200])[n - 1] || 0) * n : (n >= 2 ? 10 : n === 1 ? 4 : 0) * 7 * n;
-    v += 0.4 * nOpp(s) * HORIZON * pAvg * (r(k + 1) - r(k));
+    v += PR(s).air * nOpp(s) * PR(s).H * pAvg * (r(k + 1) - r(k));
     if (k > 0) why.push(`${k + 1}-й ${b.type === 'airport' ? 'аеропорт' : 'компанія'}`);
   }
   return { value: Math.round(v), why };
@@ -88,11 +92,13 @@ function mortgageCapacity(s, pid, exceptIdx = -1) {
 export function buyAdvice(s, pid, i, P, profileOf = null) {
   const me = s.participants.find((p) => p.id === pid), b = s.blocks[i];
   const { value, why } = valueOf(s, i, pid, P), dz = danger(s, pid);
-  const after = me.money - b.price, cap = mortgageCapacity(s, pid);
-  const maxBid = Math.max(0, Math.min(value, me.money - Math.min(dz.reserve, 80)));
+  const pr = PR(s), after = me.money - b.price, cap = mortgageCapacity(s, pid);
+  const reserve = Math.max(dz.reserve, Math.round(pr.resBase + pr.resLate * (1 - stage(s).unownedShare)));
+  dz.reserve = reserve;
+  const maxBid = Math.max(0, Math.round(Math.min(value * pr.aucMult, me.money - Math.min(reserve, pr.aucKeep + 40))));
   let verdict, text;
-  if (after >= dz.reserve && value >= b.price * 0.85) { verdict = 'buy'; text = `КУПУЙ за $${b.price}`; }
-  else if (after >= 0 && after + cap >= dz.reserve && value >= b.price * 1.15) { verdict = 'buy'; text = `КУПУЙ (за потреби заклади непотрібне)`; }
+  if (after >= dz.reserve && value >= b.price * pr.buyMin) { verdict = 'buy'; text = `КУПУЙ за $${b.price}`; }
+  else if (after >= 0 && after + cap >= dz.reserve && value >= b.price * Math.max(1.15, pr.buyMin + 0.3)) { verdict = 'buy'; text = `КУПУЙ (за потреби заклади непотрібне)`; }
   else if (after >= 0 && value >= b.price * 1.3 && stage(s).unownedShare > 0.4) { verdict = 'buy'; text = `КУПУЙ, ризиковано: запас буде $${after}`; }
   else { verdict = 'auction'; text = `Аукціон: став до $${maxBid}`; }
   const reasons = [...why];
@@ -116,7 +122,8 @@ export function auctionAdvice(s, pid, P, profileOf = null) {
   const me = s.participants.find((p) => p.id === pid);
   const est = alivePlayers(s).map((p) => {
     const { value } = valueOf(s, i, p.id, P);
-    let max = Math.min(value, p.money - 40), learned = null;
+    const prm = PR(s);
+    let max = p.id === pid ? Math.min(value * prm.aucMult, p.money - prm.aucKeep) : Math.min(value, p.money - 40), learned = null;
     const pr = p.id !== pid && profileOf ? profileOf(p) : null;
     if (pr && pr.auctionN >= 2 && pr.auctionP75) {
       const need = b.type === 'city' && groupIndices(s, b.countryId).filter((j) => j !== i).every((j) => s.blocks[j].ownerId === p.id);
@@ -203,18 +210,18 @@ export function tradeAdvice(s, pid, t, P, profileOf = null) {
   }
   const dMe = portfolio(after, pid, P) - portfolio(s, pid, P);
   const dOther = portfolio(after, other, P) - portfolio(s, other, P);
-  const score = dMe - 0.6 * dOther;
+  const prT = PR(s), score = dMe - prT.deny * dOther;
   const myOffer = role === 'incoming' ? t.recipientOffer || {} : t.initiatorOffer || {};
   const theirOffer = role === 'incoming' ? t.initiatorOffer || {} : t.recipientOffer || {};
   res.score = Math.round(score); res.dMe = Math.round(dMe); res.dOther = Math.round(dOther);
-  res.verdict = score > 40 ? 'accept' : score > -40 ? 'neutral' : 'reject';
+  res.verdict = score > prT.acceptMargin ? 'accept' : score > -Math.abs(prT.acceptMargin) ? 'neutral' : 'reject';
   // Максимальна доплата з мого боку, при якій обмін ще вигідний
   res.maxExtraPay = Math.max(0, Math.round((myOffer.money || 0) + score / 1.6));
   // Якщо я віддаю ділянку, що завершує набір суперника, — нижня межа як у попередженні (ціна + 0.6·T)
   let floor = 0;
   for (const i of myOffer.propertyIndices || []) {
     const b = s.blocks[i];
-    if (b?.type === 'city' && setOwner(after, b.countryId) === other) floor += b.price + 0.6 * Math.max(0, groupT(s, b.countryId, P));
+    if (b?.type === 'city' && setOwner(after, b.countryId) === other) floor += b.price + prT.deny * Math.max(0, groupT(s, b.countryId, P));
   }
   if (floor && (theirOffer.money || 0) < floor) { res.verdict = 'reject'; }
   res.minAskIfReject = res.verdict === 'reject' ? Math.round(Math.max(floor, (theirOffer.money || 0) - score / 1.6)) : null;
@@ -245,10 +252,10 @@ export function tradeIdeas(s, pid, P, profileOf = null) {
   }
   for (const [g, j, q] of needs) {
     const b = s.blocks[j], T = Math.max(0, groupT(s, g, P)), I3 = groupIncome(s, g, 3, P);
-    const buyerMax = Math.round(b.price + 0.6 * T), sellerAsk = Math.round(1.5 * b.price + HORIZON * I3 * 0.5);
+    const prI = PR(s), buyerMax = Math.round(b.price + prI.buyShare * T), sellerAsk = Math.round(1.5 * b.price + prI.H * I3 * 0.5);
     const qn = s.participants.find((p) => p.id === q)?.name || '?';
     // після покупки мають лишитися гроші хоча б на 1 будинок на кожну ділянку набору
-    const n = groupIndices(s, g).length, buildCash = b.housePrice * n;
+    const n = groupIndices(s, g).length, buildCash = b.housePrice * n * Math.max(0.5, prI.buildCashLots);
     const cap = Math.min(buyerMax, me.money - Math.max(100, buildCash));
     const open = Math.round(b.price * 1.5 / 10) * 10;
     const pr = profileOf ? profileOf(s.participants.find((p) => p.id === q) || {}) : null;
@@ -264,7 +271,7 @@ export function tradeIdeas(s, pid, P, profileOf = null) {
       if (idx2.some((i) => s.blocks[i].level > 0)) continue;
       const theirs = idx2.filter((i) => s.blocks[i].ownerId === q), mineThere = idx2.filter((i) => s.blocks[i].ownerId === pid);
       if (theirs.length === idx2.length - 1 && mineThere.length === 1) {
-        const bal = Math.round(0.5 * (groupT(s, g, P) - groupT(s, g2, P)));
+        const bal = Math.round(0.5 * PR(s).swapPay * (groupT(s, g, P) - groupT(s, g2, P)));
         const qp = s.participants.find((p) => p.id === q), qn = qp?.name || '?';
         let tail = ', без доплати';
         if (bal > 20) { const c = Math.max(0, Math.min(bal, me.money - 100)); tail = `, ти доплачуєш до $${c}` + (c < bal ? ' (більше не варто: потрібні гроші на будинки)' : ''); }
@@ -281,7 +288,7 @@ export function tradeIdeas(s, pid, P, profileOf = null) {
     if (o && o !== pid && others.every((i) => s.blocks[i].ownerId === o)) {
       const on = s.participants.find((p) => p.id === o)?.name || '?';
       const T = Math.max(0, groupT(s, g, P));
-      ideas.push({ kind: 'warn', text: `${on} чекає на твою ${s.blocks[mineI[0]].name} (${groupName(g)}). Не віддавай дешевше ~$${Math.round(s.blocks[mineI[0]].price + 0.6 * T)}`, group: g, gain: -T });
+      ideas.push({ kind: 'warn', text: `${on} чекає на твою ${s.blocks[mineI[0]].name} (${groupName(g)}). Не віддавай дешевше ~$${Math.round(s.blocks[mineI[0]].price + PR(s).deny * T)}`, group: g, gain: -T });
     }
   }
   return ideas.sort((a, b) => b.gain - a.gain).slice(0, 6);
@@ -290,7 +297,9 @@ export function tradeIdeas(s, pid, P, profileOf = null) {
 export function buildPlan(s, pid, P, budgetOverride) {
   const me = s.participants.find((p) => p.id === pid); if (!me) return { steps: [], budget: 0 };
   const dz = danger(s, pid), opp = nOpp(s);
-  let budget = budgetOverride ?? (me.money - Math.max(dz.reserve, 100));
+  const prB = PR(s), round = Math.floor((s.stats?.turnsCount || 0) / Math.max(1, alivePlayers(s).length));
+  const bReserve = Math.max(dz.reserve, Math.round(prB.bRes + prB.bResGrow * round));
+  let budget = budgetOverride ?? (me.money - bReserve);
   const c = JSON.parse(JSON.stringify({ blocks: s.blocks, settings: s.settings, participants: s.participants, boardConfig: s.boardConfig }));
   const steps = [];
   const unm = [];
@@ -300,7 +309,7 @@ export function buildPlan(s, pid, P, budgetOverride) {
   for (let guard = 0; guard < 30 && budget > 0; guard++) {
     let best = -1, bestRoi = 0;
     c.blocks.forEach((b, i) => {
-      if (!canUpgrade(c, i, pid) || b.housePrice > budget) return;
+      if (!canUpgrade(c, i, pid) || b.housePrice > budget || (b.level || 0) >= Math.round(prB.maxLevel)) return;
       const L = b.level || 0, dbl = !!c.settings?.payDoubleRentWhenOwnFullSet && L === 0 ? 2 : 1;
       const roi = P[i] * (rentAt(b, L + 1) - rentAt(b, L) * dbl) / b.housePrice;
       if (roi > bestRoi) { bestRoi = roi; best = i; }
@@ -325,7 +334,7 @@ export function buildPlan(s, pid, P, budgetOverride) {
     }
     if (cost > 0) sets.push({ name: groupName(g), cost, gainPerRound: Math.round(gain), payback: gain > 0 ? Math.ceil(cost / gain) : null });
   }
-  return { steps, sets, budget: Math.max(0, me.money - Math.max(dz.reserve, 100)), reserve: dz.reserve, mortgagedInSets: unm.map((i) => s.blocks[i].name) };
+  return { steps, sets, budget: Math.max(0, me.money - bReserve), reserve: bReserve, maxLevel: Math.round(prB.maxLevel), mortgagedInSets: unm.map((i) => s.blocks[i].name) };
 }
 
 export function debtPlan(s, pid, P) {
@@ -358,8 +367,8 @@ export function jailAdvice(s, pid) {
   const oppDanger = s.blocks.some((b) => b.ownerId && b.ownerId !== pid && (b.level || 0) >= 2);
   const hasPardon = ['treasure', 'surprise'].some((d) => s.bonusCards?.[d]?.pardonCardHolderId === pid);
   const me = s.participants.find((p) => p.id === pid);
-  const leave = st.unownedShare > 0.25 && !oppDanger;
-  if (leave) return { verdict: hasPardon ? 'pardon' : 'pay', text: hasPardon ? 'Використай Pardon і виходь' : `Плати $${PRISON_FEE} і виходь: ще є що купувати`, reasons: [`вільних ділянок ${Math.round(st.unownedShare * 100)}%`] };
+  const leave = st.unownedShare > PR(s).jailU && !oppDanger;
+  if (leave) return { verdict: hasPardon ? 'pardon' : 'pay', text: hasPardon ? 'Використай Pardon і виходь' : `Плати $${PRISON_FEE} і виходь: ще є що купувати`, reasons: [`вільних ділянок ${Math.round(st.unownedShare * 100)}% (поріг ${Math.round(PR(s).jailU * 100)}%)`] };
   return { verdict: 'stay', text: 'Сиди й кидай на дубль: у тюрмі безпечніше', reasons: [oppDanger ? 'у суперників є будинки' : 'майже все розкуплено', me && me.money < 200 ? 'мало грошей' : ''].filter(Boolean) };
 }
 
@@ -389,6 +398,9 @@ export function analyze(s, pid, profileOf = null) {
   const cur = currentPlayer(s);
   const myTurn = !!(me && cur && cur.id === pid);
   const out = { phase: s.phase, myTurn, meId: me ? pid : null, players: playersSummary(s, pid), stage: stage(s), colors: colorMap(s), board: boardOwnership(s, pid) };
+  const fsm = TUNED.meta && TUNED.meta.firstSet && TUNED.meta.firstSet[s.settings?.payDoubleRentWhenOwnFullSet ? 'dbl1' : 'dbl0'];
+  out.firstSet = fsm ? Object.entries(fsm).filter(([k]) => k !== 'none').sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ name: groupName(k), p: v })) : null;
+  out.tuned = !!(TUNED.meta);
   if (s.phase === 'lobby') { out.groups = groupTable(s, P); return out; }
   if (!me || me.bankruptedAt) { out.trades = (s.trades || []).filter((t) => t.status === 'pending').map((t) => tradeAdvice(s, pid, t, P, profileOf)); return out; }
   out.danger = danger(s, pid);
@@ -497,7 +509,7 @@ export function rivalThreats(s, pid, P = boardProbs(s).leave) {
     // Як перебити: купити ключову ділянку в того, кому вона потрібна менше (вартість блокування)
     const key = kind === 'swap' ? (ta >= tb ? na : nb) : (na || nb);
     const keyHolder = key.holder, lot = key.lots[0], lb = s.blocks[lot];
-    const block = Math.round(lb.price + 0.35 * HORIZON * groupIncome(s, key.g, 3, P) / key.lots.length);
+    const block = Math.round(lb.price + PR(s).block * PR(s).H * groupIncome(s, key.g, 3, P) / key.lots.length);
     const cap = me ? Math.max(0, Math.min(block, me.money - Math.max(100, danger(s, pid).reserve))) : 0;
     const counter = cap >= lb.price ? `Перебий: запропонуй ${name(keyHolder)} за ${lb.name} до $${cap}, щоб зламати ${groupName(key.g)}` : `Грошей на перехоплення ${lb.name} замало: тримай запас і не продавай їм ключових ділянок`;
     out.push({ a, b, kind, text, counter, gain: ta + tb,

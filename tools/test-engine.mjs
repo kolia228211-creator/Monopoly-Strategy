@@ -60,8 +60,8 @@ s = makeState(); own(s, 'p1', ['Lyon', 'Toulouse']); own(s, 'p0', ['Paris']);
 const bad = tradeAdvice(s, 'p0', { id: 't1', initiatorId: 'p1', recipientId: 'p0', initiatorOffer: { money: 300, propertyIndices: [], pardonCards: [] }, recipientOffer: { money: 0, propertyIndices: [idxOf(s, 'Paris')], pardonCards: [] }, status: 'pending' }, P);
 ok('віддати Paris суперникові за $300 — відхилити', bad.verdict === 'reject', `${bad.text}; мінімум просити ~$${bad.minAskIfReject}`);
 ok('межа обміну = межа попередження', bad.minAskIfReject > 2000, String(bad.minAskIfReject));
-const good = tradeAdvice(s, 'p0', { id: 't2', initiatorId: 'p1', recipientId: 'p0', initiatorOffer: { money: 3000, propertyIndices: [], pardonCards: [] }, recipientOffer: { money: 0, propertyIndices: [idxOf(s, 'Paris')], pardonCards: [] }, status: 'pending' }, P);
-ok('за $3000 — уже можна', good.verdict !== 'reject', good.text + ' score ' + good.score);
+const good = tradeAdvice(s, 'p0', { id: 't2', initiatorId: 'p1', recipientId: 'p0', initiatorOffer: { money: bad.minAskIfReject + 50, propertyIndices: [], pardonCards: [] }, recipientOffer: { money: 0, propertyIndices: [idxOf(s, 'Paris')], pardonCards: [] }, status: 'pending' }, P);
+ok('за суму, вищу за межу, — уже можна', good.verdict !== 'reject', `$${bad.minAskIfReject + 50}: ` + good.text + ' score ' + good.score);
 
 // 10. Ідеї обмінів
 s = makeState(); own(s, 'p0', ['Lyon', 'Toulouse', 'Rome']); own(s, 'p1', ['Paris', 'Venice', 'Milan']);

@@ -70,7 +70,7 @@ export function createUI(version) {
   root.innerHTML = `<style>${CSS}</style><div class="panel"><div class="hd"><b>🎲 Помічник</b><span class="now"></span>
     <button data-a="min" title="Згорнути">▾</button><button data-a="close" title="Закрити">✕</button></div>
     <div class="bd"><div class="card"><div class="mut">Шукаю гру на сторінці…</div></div></div>
-    <div class="ft"><span>v${esc(version)} · <span class="stats"></span></span><span><button data-a="exp" title="Зберегти журнал і профілі у файл">⤓ журнал</button> <button data-a="imp" title="Завантажити журнал/профілі з файлу">⤒</button> <span class="upd"></span></span></div>
+    <div class="ft"><span>v${esc(version)} · self-play · <span class="stats"></span></span><span><button data-a="exp" title="Зберегти журнал і профілі у файл">⤓ журнал</button> <button data-a="imp" title="Завантажити журнал/профілі з файлу">⤒</button> <span class="upd"></span></span></div>
     <input type="file" accept="application/json,.json" hidden></div>`;
   (document.body || document.documentElement).appendChild(host);
   const panel = root.querySelector('.panel'), bd = root.querySelector('.bd'), nowEl = root.querySelector('.now'), upd = root.querySelector('.upd'), statsEl = root.querySelector('.stats');
@@ -177,6 +177,7 @@ export function createUI(version) {
     }
     if (m.phase === 'lobby' && m.groups) {
       h += `<div class="card"><div class="ttl"><span>Найвигідніші набори</span><span>окупність</span></div><ul>${m.groups.map((g) => `<li>${esc(g.name)}: 3 буд. дають ~${money(g.I3)} з кожного ходу суперника, окупність ~${g.payback3 ?? "—"} кіл</li>`).join('')}</ul><div class="mut">Чекаю старту гри. Поради з'являться автоматично.</div></div>`;
+      if (m.firstSet) h += `<div class="card"><div class="ttl"><span>Self-play: перший набір → перемога</span></div><div class="mut">${m.firstSet.map((x) => `${esc(x.name)} ${Math.round(x.p * 100)}%`).join(' · ')}</div><div class="mut">Мільйон партій ботів: хто першим зібрав цей набір, стільки разів виграв. Без жодного набору перемог майже немає.</div></div>`;
     }
     if (m.players && m.phase !== 'lobby') h += players(m, wins, busy);
     (m.trades || []).forEach((t) => {
