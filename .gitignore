@@ -80,7 +80,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist — зібрані файли комітимо (їх роздає CDN)
 .output
 
 # Gatsby files
