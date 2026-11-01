@@ -86,3 +86,33 @@ const w2 = winProbs(s2, { n: 300 });
 ok('рівний старт: шанси 15–35% у кожного', Object.values(w2.base).every((v) => v > 0.12 && v < 0.38), Object.values(w2.base).map((v) => Math.round(v * 100) + '%').join(', '));
 
 if (fails) { console.log(`\n${fails} FAIL`); process.exit(1); } else console.log('\nУсе пройдено');
+
+// ---- v0.4: прогноз кидка з START, податком і картками ----
+{
+  const { nextRoll, deckInfo } = await import('../src/helper/roll.js');
+  let s = makeState(); s.participants[0].position = idxOf(s, 'JFK Airport'); s.participants[0].money = 828;
+  let r = nextRoll(s, 'p0', { keepLeaves: true });
+  ok('кидок: сума ймовірностей = 1', Math.abs(r.check - 1) < 1e-9, r.check.toFixed(6));
+  const tax = r.leaves.find((l) => /^\+200 START → Earnings Tax$/.test(l.label));
+  ok('кидок: податок після START = $102 (10% від 828+200)', tax && tax.pay === 102 && tax.cash === 98, tax && `${tax.label}: плата ${tax.pay}, разом ${tax.cash}`);
+  ok('кидок: чистий результат враховує +200 за START', r.net > 50, `net ${r.net}, плата ${r.expected}`);
+  // підрахунок карток
+  s = makeState(); let d = deckInfo(s, 'surprise');
+  ok('колода: на старті 17 невідомих карток', !d.known && d.next.length === 17);
+  s.bonusCards.surprise.currentIndex = 5; d = deckInfo(s, 'surprise');
+  ok('колода: вийшло 5 => лишилось 12', !d.known && d.next.length === 12 && Math.abs(d.next.reduce((a, x) => a + x.p, 0) - 1) < 1e-9);
+  s.bonusCards.surprise.currentIndex = 17 + 3; d = deckInfo(s, 'surprise');
+  ok('колода: друге коло => наступна відома з пам\'яті', d.known && d.next[0].card.id === s.bonusCards.surprise.cards[3].id, d.next[0].card.id);
+  s.bonusCards.surprise.currentIndex = 17 + 6; s.bonusCards.surprise.pardonCardHolderId = 'p2'; d = deckInfo(s, 'surprise');
+  ok('колода: Pardon пропускається, поки його тримають', d.next[0].card.effect.type !== 'get-pardon-card', d.next[0].card.id);
+  // Surprise на 36: точно відома картка "на New York" з власником-суперником
+  s = makeState(); own(s, 'p1', ['New York', 'San Francisco']); s.blocks[idxOf(s, 'New York')].level = 3;
+  const ny = s.bonusCards.surprise.cards.findIndex((c) => c.effect.type === 'move-to-block' && c.effect.blockIndex === 39);
+  s.bonusCards.surprise.currentIndex = 17 + ny; s.participants[0].position = idxOf(s, 'Surprise') - 8 >= 0 ? 28 : 28; // з Toulouse (28) до Surprise (36) = 8
+  r = nextRoll(s, 'p0');
+  ok('відома картка «на New York» потрапляє в прогноз', /Surprise: на New York/.test(r.worstName) && r.worst >= 1400, `${r.worst} (${r.worstName})`);
+  // тюрма: без дубля лишаєшся
+  s = makeState(); s.blocks[10].suspendedTurnsRemaining = { p0: 2 }; s.participants[0].position = 10;
+  r = nextRoll(s, 'p0'); ok('у тюрмі: рух лише з дублем (1/6)', Math.abs(r.pPay + r.pBuy + 0) <= 0.2, `pBuy ${r.pBuy.toFixed(3)}`);
+  if (fails) { console.log(fails + ' FAIL'); process.exit(1); } else console.log('Прогноз кидка: усе пройдено');
+}

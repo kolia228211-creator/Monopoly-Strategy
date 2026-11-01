@@ -5,6 +5,7 @@ import {
   canUpgrade, canDowngrade, canMortgage, assetValue, liquidationValue, groupName, PRISON_FEE, tradeFairnessOk, prisonIndex
 } from './rules.js';
 import { boardProbs, DICE } from './probability.js';
+import { nextRoll, deckInfo, cardKind, cardText } from './roll.js';
 
 export const HORIZON = 25;   // скільки ходів кожного суперника враховуємо для окупності
 
@@ -51,23 +52,26 @@ export function valueOf(s, i, pid, P = boardProbs(s).leave) {
   return { value: Math.round(v), why };
 }
 
-// Скільки можуть забрати на наступному кидку (розподіл платежу) => безпечний запас
+// Прогноз наступного кидка (START, податки, картки з підрахунком, дублі) => безпечний запас
 export function danger(s, pid) {
-  const p = s.participants.find((x) => x.id === pid); if (!p) return { expected: 0, q85: 0, worst: 0, reserve: 50 };
-  const N = s.blocks.length, outcomes = [];
-  for (let d = 2; d <= 12; d++) {
-    const j = (p.position + d) % N, b = s.blocks[j];
-    let pay = 0;
-    if (isBuyable(b) && b.ownerId && b.ownerId !== pid) pay = rentFor(s, j, d);
-    else if (b.bonusType === 'tax') pay = Math.floor(Math.max(0, p.money) * (b.taxPercentage || 10) / 100);
-    else if (b.bonusType === 'premium-tax') pay = b.taxAmount || 75;
-    outcomes.push([pay, DICE[d], s.blocks[j].name]);
+  const r = nextRoll(s, pid);
+  return r || { net: 0, expected: 0, q85: 0, worst: 0, worstName: '', reserve: 50, pBuy: 0, pJail: 0 };
+}
+
+// Шанс, що наступна витягнута картка відправить гравця на клітинку i
+export function cardPullTo(s, i) {
+  const out = [];
+  for (const deck of ['treasure', 'surprise']) {
+    const d = deckInfo(s, deck); if (!d) continue;
+    let p = 0;
+    for (const { card, p: q } of d.next) {
+      const e = card.effect;
+      if (e?.type === 'move-to-block' && e.blockIndex === i) p += q;
+      if (e?.type === 'move-to-next-grouped' && s.blocks[i] && s.blocks[i].type === (e.group === 'airport' ? 'airport' : 'company')) p += q / Math.max(1, s.blocks.filter((b) => b.type === s.blocks[i].type).length);
+    }
+    if (p > 0) out.push({ deck, p, known: d.known });
   }
-  outcomes.sort((a, b) => a[0] - b[0]);
-  let acc = 0, q85 = 0; const expected = outcomes.reduce((a, [v, pr]) => a + v * pr, 0);
-  for (const [v, pr] of outcomes) { acc += pr; if (acc >= 0.85) { q85 = v; break; } }
-  const worstO = outcomes[outcomes.length - 1];
-  return { expected: Math.round(expected), q85, worst: worstO[0], worstName: worstO[2], reserve: Math.max(50, q85, Math.round(expected * 2)) };
+  return out;
 }
 
 function mortgageCapacity(s, pid, exceptIdx = -1) {
@@ -94,6 +98,7 @@ export function buyAdvice(s, pid, i, P, profileOf = null) {
   const reasons = [...why];
   reasons.push(`цінність для тебе ≈ $${value} (ціна $${b.price}, ${stage(s).name} гра)`);
   reasons.push(`після покупки: $${after}, безпечний запас $${dz.reserve}`);
+  for (const c of cardPullTo(s, i)) reasons.push(`${c.known ? 'наступна' : 'шанс ' + Math.round(c.p * 100) + '%, що наступна'} картка ${c.deck === 'treasure' ? 'Treasure' : 'Surprise'} відправить гравця сюди`);
   if (profileOf) {
     const meds = alivePlayers(s).filter((p) => p.id !== pid).map(profileOf).filter((x) => x && x.auctionN >= 3 && x.auctionMed);
     if (meds.length) {
@@ -381,7 +386,7 @@ export function analyze(s, pid, profileOf = null) {
   const me = s.participants.find((p) => p.id === pid) || null;
   const cur = currentPlayer(s);
   const myTurn = !!(me && cur && cur.id === pid);
-  const out = { phase: s.phase, myTurn, meId: me ? pid : null, players: playersSummary(s, pid), stage: stage(s) };
+  const out = { phase: s.phase, myTurn, meId: me ? pid : null, players: playersSummary(s, pid), stage: stage(s), colors: colorMap(s), board: boardOwnership(s, pid) };
   if (s.phase === 'lobby') { out.groups = groupTable(s, P); return out; }
   if (!me || me.bankruptedAt) { out.trades = (s.trades || []).filter((t) => t.status === 'pending').map((t) => tradeAdvice(s, pid, t, P, profileOf)); return out; }
   out.danger = danger(s, pid);
@@ -394,6 +399,7 @@ export function analyze(s, pid, profileOf = null) {
   out.build = buildPlan(s, pid, P);
   out.ideas = tradeIdeas(s, pid, P, profileOf);
   if (profileOf) out.rivals = s.participants.filter((p) => p.id !== pid).map((p) => ({ name: p.name, color: p.appearance, isBot: p.isBot, ...(profileOf(p) || {}) }));
+  out.cards = cardsSummary(s);
   // Головна порада зараз
   if (out.debt) out.now = { kind: 'debt', title: `Борг $${out.debt.short}: продай/заклади`, tone: 'bad' };
   else if (out.auction) out.now = { kind: 'auction', title: out.auction.text, tone: out.auction.verdict === 'bid' ? 'good' : 'neutral' };
@@ -403,5 +409,43 @@ export function analyze(s, pid, profileOf = null) {
   else if (myTurn && out.build.steps.length) out.now = { kind: 'build', title: `Будуй: ${out.build.steps[0].name} (${out.build.steps[0].from}→${out.build.steps[0].to})`, tone: 'good' };
   else if (myTurn) out.now = { kind: 'turn', title: s.cubesRolledInTurn ? 'Можна завершувати хід' : 'Кидай кубики', tone: 'neutral' };
   else out.now = { kind: 'wait', title: `Хід: ${cur ? cur.name : '…'}`, tone: 'neutral' };
+  return out;
+}
+
+// Кольори для панелі: нік -> колір гравця, ділянка -> колір власника
+export function colorMap(s) {
+  const pc = {}; s.participants.forEach((p) => { pc[p.name] = p.appearance || '#999'; });
+  const bc = {};
+  s.blocks.forEach((b) => { if (isBuyable(b)) { const o = s.participants.find((p) => p.id === b.ownerId); bc[b.name] = o ? (o.appearance || '#999') : null; } });
+  return { players: pc, blocks: bc };
+}
+
+// Мапа власності по наборах для панелі
+export function boardOwnership(s, pid) {
+  const rows = [], seen = new Set();
+  s.blocks.forEach((b) => {
+    if (!isBuyable(b)) return;
+    const key = groupKey(b); if (seen.has(key)) return; seen.add(key);
+    const idx = groupIndices(s, key);
+    rows.push({
+      key, name: key === '@airport' ? 'Аеропорти' : key === '@company' ? 'Компанії' : groupName(key), full: setOwner(s, key),
+      lots: idx.map((i) => { const x = s.blocks[i], o = s.participants.find((p) => p.id === x.ownerId); return { i, name: x.name, color: o ? o.appearance : null, owner: o ? o.name : null, mine: x.ownerId === pid, level: x.level || 0, mort: !!x.isMortgaged }; })
+    });
+  });
+  return rows;
+}
+
+// Підрахунок карток: що лишилось у колодах
+export function cardsSummary(s) {
+  const out = [];
+  for (const deck of ['surprise', 'treasure']) {
+    const d = deckInfo(s, deck); if (!d) continue;
+    const kinds = { earn: 0, pay: 0, move: 0, jail: 0, pardon: 0 };
+    d.next.forEach(({ card, p }) => { kinds[cardKind(card.effect)] += p; });
+    const moves = [...new Set(d.next.filter(({ card }) => cardKind(card.effect) === 'move').map(({ card }) => cardText(s, card.effect)))];
+    out.push({ deck, title: deck === 'treasure' ? 'Treasure' : 'Surprise', known: d.known, seen: d.seen, total: d.total, left: d.next.length,
+      nextText: d.known ? (d.next[0].card.description || cardText(s, d.next[0].card.effect)) : null, nextEffect: d.known ? cardText(s, d.next[0].card.effect) : null,
+      kinds, moves });
+  }
   return out;
 }
