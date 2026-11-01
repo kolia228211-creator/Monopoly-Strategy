@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "RichUp Помічник",
+  "version": "0.2.0",
+  "description": "Поради в реальному часі для richup.io: купівля, аукціон, обміни, будинки, шанси на перемогу.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://richup.io/*"
+      ],
+      "js": [
+        "helper.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "128": "icon128.png"
+  }
+}
