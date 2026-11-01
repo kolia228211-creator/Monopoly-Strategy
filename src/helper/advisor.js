@@ -265,9 +265,11 @@ export function tradeIdeas(s, pid, P, profileOf = null) {
       const theirs = idx2.filter((i) => s.blocks[i].ownerId === q), mineThere = idx2.filter((i) => s.blocks[i].ownerId === pid);
       if (theirs.length === idx2.length - 1 && mineThere.length === 1) {
         const bal = Math.round(0.5 * (groupT(s, g, P) - groupT(s, g2, P)));
-        const qn = s.participants.find((p) => p.id === q)?.name || '?';
-        ideas.push({ kind: 'swap', text: `Обмін з ${qn}: твоя ${s.blocks[mineThere[0]].name} ↔ його ${s.blocks[j].name}` +
-          (bal > 20 ? `, ти доплачуєш до $${bal}` : bal < -20 ? `, він доплачує тобі $${-bal}` : ', без доплати'), group: g, gain: groupT(s, g, P) });
+        const qp = s.participants.find((p) => p.id === q), qn = qp?.name || '?';
+        let tail = ', без доплати';
+        if (bal > 20) { const c = Math.max(0, Math.min(bal, me.money - 100)); tail = `, ти доплачуєш до $${c}` + (c < bal ? ' (більше не варто: потрібні гроші на будинки)' : ''); }
+        else if (bal < -20) { const c = Math.max(0, Math.min(-bal, qp ? qp.money : 0)); tail = c < -bal ? `, він доплачує все, що може (~$${c} з $${-bal} чесних) або додає ділянку` : `, він доплачує тобі $${c}`; }
+        ideas.push({ kind: 'swap', text: `Обмін з ${qn}: твоя ${s.blocks[mineThere[0]].name} ↔ його ${s.blocks[j].name}` + tail, group: g, gain: groupT(s, g, P) });
       }
     }
   }
@@ -398,6 +400,7 @@ export function analyze(s, pid, profileOf = null) {
   if (myTurn && s.cubesRolledInTurn && isBuyable(here) && !here.ownerId && !out.auction) out.buy = buyAdvice(s, pid, me.position, P, profileOf);
   out.build = buildPlan(s, pid, P);
   out.ideas = tradeIdeas(s, pid, P, profileOf);
+  out.threats = rivalThreats(s, pid, P);
   if (profileOf) out.rivals = s.participants.filter((p) => p.id !== pid).map((p) => ({ name: p.name, color: p.appearance, isBot: p.isBot, ...(profileOf(p) || {}) }));
   out.cards = cardsSummary(s);
   // Головна порада зараз
@@ -448,4 +451,57 @@ export function cardsSummary(s) {
       kinds, moves });
   }
   return out;
+}
+
+// Загрози: двоє суперників можуть обмінятися й обидва зібрати набори (або один продасть іншому)
+export function rivalThreats(s, pid, P = boardProbs(s).leave) {
+  const opps = alivePlayers(s).filter((p) => p.id !== pid);
+  const groups = [...new Set(s.blocks.filter((b) => b.type === 'city').map((b) => b.countryId))];
+  const need = {}; // need[a] = [{ g, lots(all owned by one holder), holder }]
+  for (const a of opps) {
+    need[a.id] = [];
+    for (const g of groups) {
+      const idx = groupIndices(s, g);
+      if (idx.some((i) => s.blocks[i].level > 0)) continue;
+      const mine = idx.filter((i) => s.blocks[i].ownerId === a.id), miss = idx.filter((i) => s.blocks[i].ownerId !== a.id);
+      if (!mine.length || !miss.length || miss.length > 2) continue;
+      const holder = s.blocks[miss[0]].ownerId;
+      if (holder && holder !== pid && miss.every((i) => s.blocks[i].ownerId === holder)) need[a.id].push({ g, lots: miss, holder });
+    }
+  }
+  const out = [], name = (id) => s.participants.find((p) => p.id === id)?.name || '?';
+  const me = s.participants.find((p) => p.id === pid);
+  for (let x = 0; x < opps.length; x++) for (let y = x + 1; y < opps.length; y++) {
+    const a = opps[x].id, b = opps[y].id;
+    const aFromB = need[a].filter((n) => n.holder === b), bFromA = need[b].filter((n) => n.holder === a);
+    if (!aFromB.length && !bFromA.length) continue;
+    const T = (n) => (n ? Math.max(0, groupT(s, n.g, P)) : 0);
+    // найкраща пара РІЗНИХ наборів (не США ↔ США)
+    let na = null, nb = null, bestSum = -1;
+    for (const u of aFromB) for (const v of bFromA) {
+      if (u.g === v.g) continue;
+      const score = T(u) + T(v) - 1e-3 * (u.lots.length + v.lots.length); // при рівності — менше ділянок (1↔1)
+      if (score > bestSum) { bestSum = score; na = u; nb = v; }
+    }
+    if (!na) { // обміну немає — можливий продаж одному з них
+      const all = aFromB.map((n) => ['a', n]).concat(bFromA.map((n) => ['b', n])).sort((u, v) => T(v[1]) - T(u[1]));
+      if (!all.length) continue;
+      if (all[0][0] === 'a') na = all[0][1]; else nb = all[0][1];
+    }
+    const ta = T(na), tb = T(nb);
+    const kind = na && nb ? 'swap' : 'sale';
+    const lotsName = (l) => l.map((i) => s.blocks[i].name).join(' + ');
+    let text;
+    if (kind === 'swap') text = `${name(a)} і ${name(b)} можуть обмінятися: ${lotsName(nb.lots)} ↔ ${lotsName(na.lots)}. Тоді ${name(a)} збере ${groupName(na.g)}, а ${name(b)} збере ${groupName(nb.g)}`;
+    else { const n = na || nb, buyer = na ? a : b, seller = na ? b : a; text = `${name(seller)} може продати ${name(buyer)} ${lotsName(n.lots)}, і той збере ${groupName(n.g)}`; }
+    // Як перебити: купити ключову ділянку в того, кому вона потрібна менше (вартість блокування)
+    const key = kind === 'swap' ? (ta >= tb ? na : nb) : (na || nb);
+    const keyHolder = key.holder, lot = key.lots[0], lb = s.blocks[lot];
+    const block = Math.round(lb.price + 0.35 * HORIZON * groupIncome(s, key.g, 3, P) / key.lots.length);
+    const cap = me ? Math.max(0, Math.min(block, me.money - Math.max(100, danger(s, pid).reserve))) : 0;
+    const counter = cap >= lb.price ? `Перебий: запропонуй ${name(keyHolder)} за ${lb.name} до $${cap}, щоб зламати ${groupName(key.g)}` : `Грошей на перехоплення ${lb.name} замало: тримай запас і не продавай їм ключових ділянок`;
+    out.push({ a, b, kind, text, counter, gain: ta + tb,
+      transfer: kind === 'swap' ? { toA: na.lots, toB: nb.lots } : (na ? { toA: na.lots, toB: [] } : { toA: [], toB: nb.lots }) });
+  }
+  return out.sort((u, v) => v.gain - u.gain).slice(0, 2);
 }

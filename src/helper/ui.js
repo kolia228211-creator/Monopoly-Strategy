@@ -200,6 +200,15 @@ export function createUI(version) {
         ${m.build.mortgagedInSets.length ? `<div class="mut">Спершу викупи заставу: ${esc(m.build.mortgagedInSets.join(', '))}</div>` : ''}</div>`;
       void order;
     }
+    if (m.threats && m.threats.length) {
+      h += `<div class="card tone-bad"><div class="ttl"><span>⚠️ Загрози обміну між суперниками</span></div>${m.threats.map((t, k) => {
+        const w = sim && sim['threat:' + k], base0 = wins;
+        const pl = (id) => m.players.find((p) => p.id === id);
+        const row = (id, lbl) => (w && base0 && id ? `${deco(lbl, m)} ${pct(base0[id])}→<b>${pct(w[id])}</b>` : '');
+        const impact = w && base0 ? [row(t.a, pl(t.a)?.name), row(t.b, pl(t.b)?.name), m.meId ? `ти ${pct(base0[m.meId])}→<b>${pct(w[m.meId])}</b> ${delta(w[m.meId] - base0[m.meId])}` : ''].filter(Boolean).join(' · ') : (sim && sim.busy ? '<span class="spin"></span> рахую вплив' : '');
+        return `<div>${deco(t.text, m)}</div>${impact ? `<div class="mut">Якщо так станеться: ${impact}</div>` : ''}<div class="mut">${deco(t.counter, m)}</div>`;
+      }).join('<hr style="border:0;border-top:1px solid var(--line);margin:4px 0">')}</div>`;
+    }
     if (m.ideas && m.ideas.length) h += `<div class="card"><div class="ttl"><span>Ідеї обмінів</span></div><ul>${m.ideas.map((i) => `<li>${i.kind === 'warn' ? '⚠️ ' : ''}${deco(i.text, m)}</li>`).join('')}</ul></div>`;
     if (m.danger) {
       const d = m.danger, sign = (v) => (v >= 0 ? '+' : '−') + money(Math.abs(v)).replace(/^[−]/, '');

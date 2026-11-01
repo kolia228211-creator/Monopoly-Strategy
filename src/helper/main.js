@@ -49,6 +49,7 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
     return [s.phase, s.blocks.map((b) => (b.ownerId || '') + (b.level || 0) + (b.isMortgaged ? 'm' : '')).join(','),
       s.participants.map((p) => Math.round(p.money / 25) + (p.bankruptedAt ? 'x' : '')).join(','),
       (s.trades || []).filter((t) => !t.status || t.status === 'pending').map((t) => t.id).join(','),
+      (H.model && H.model.threats || []).map((t) => t.a + t.b + t.kind).join(','),
       s.auction && s.auction.state !== 'ended' ? 'a' + s.auction.blockIndex : '', s.cubesRolledInTurn ? 'r' : ''].join('|');
   }
   function variantsFor(s, m) {
@@ -62,6 +63,13 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
         if (best >= 0 && X.money[best] > price) { X.owner[i] = best; X.money[best] -= price; }
       };
     }
+    (m.threats || []).forEach((t, k) => {
+      v['threat:' + k] = (X) => {
+        const a = ix(X, t.a), b = ix(X, t.b); if (a < 0 || b < 0) return;
+        t.transfer.toA.forEach((i) => { X.owner[i] = a; }); t.transfer.toB.forEach((i) => { X.owner[i] = b; });
+        if (t.kind === 'sale') { const buyer = t.transfer.toA.length ? a : b, seller = buyer === a ? b : a; const pay = Math.min(X.money[buyer] - 50, 400); if (pay > 0) { X.money[buyer] -= pay; X.money[seller] += pay; } }
+      };
+    });
     (m.trades || []).filter((t) => t.role !== 'others').forEach((t) => {
       const raw = (s.trades || []).find((x) => x.id === t.id); if (!raw) return;
       v['trade:' + t.id] = (X) => {

@@ -116,3 +116,18 @@ if (fails) { console.log(`\n${fails} FAIL`); process.exit(1); } else console.log
   r = nextRoll(s, 'p0'); ok('у тюрмі: рух лише з дублем (1/6)', Math.abs(r.pPay + r.pBuy + 0) <= 0.2, `pBuy ${r.pBuy.toFixed(3)}`);
   if (fails) { console.log(fails + ' FAIL'); process.exit(1); } else console.log('Прогноз кидка: усе пройдено');
 }
+
+// ---- загрози обміну між суперниками ----
+{
+  const { rivalThreats } = await import('../src/helper/advisor.js');
+  const { winProbs } = await import('../src/helper/sim.js');
+  let s = makeState(); s.participants[0].money = 563;
+  own(s, 'p1', ['Venice', 'San Francisco']); own(s, 'p3', ['Milan', 'Rome', 'New York']); s.participants[1].money = 1025; s.participants[3].money = 587; own(s, 'p0', ['Salvador', 'Jerusalem', 'Berlin', 'TLV Airport']);
+  const th = rivalThreats(s, 'p0');
+  ok('загроза: Andrii ↔ Ira обмін Venice ↔ New York', th.length >= 1 && th[0].kind === 'swap' && /Venice/.test(th[0].text) && /New York/.test(th[0].text), th[0] && th[0].text);
+  ok('загроза: порада, як перебити', th[0] && /Перебий|замало/.test(th[0].counter), th[0] && th[0].counter);
+  const w = winProbs(s, { n: 600, variants: { swap: (X) => { th[0].transfer.toA.forEach((i) => { X.owner[i] = X.ids.indexOf(th[0].a); }); th[0].transfer.toB.forEach((i) => { X.owner[i] = X.ids.indexOf(th[0].b); }); } } });
+  const f = (o) => Object.entries(o).map(([k, v]) => k + ' ' + Math.round(v * 100) + '%').join(', ');
+  ok('після їхнього обміну мій шанс падає', w.swap.p0 < w.base.p0, `до: ${f(w.base)} | після: ${f(w.swap)}`);
+  if (fails) { console.log(fails + ' FAIL'); process.exit(1); } else console.log('Загрози: усе пройдено');
+}
