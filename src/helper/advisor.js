@@ -97,6 +97,15 @@ export function buyAdvice(s, pid, i, P, profileOf = null) {
   dz.reserve = reserve;
   const maxBid = Math.max(0, Math.round(Math.min(value * pr.aucMult, me.money - Math.min(reserve, pr.aucKeep + 40))));
   let verdict, text;
+  if (me.money < b.price) {
+    // Купити неможливо: у richup лишається тільки «Завершити хід» (ділянка піде на аукціон)
+    const bid = Math.max(0, Math.min(maxBid, me.money - 10));
+    verdict = 'cant';
+    text = `Не вистачає $${b.price - Math.max(0, me.money)}: заверши хід` + (bid >= 10 ? `, на аукціоні став до $${bid}` : '');
+    const reasons = [...why, `цінність для тебе ≈ $${value} (ціна $${b.price}), у тебе $${me.money}`];
+    if (cap > 0 && me.money + cap >= b.price && value >= b.price * 1.3) reasons.push(`ділянка цінна: наступного разу варто мати запас або закласти щось непотрібне заздалегідь`);
+    return { idx: i, name: b.name, price: b.price, value, verdict, text, maxBid: bid, reasons, affordable: false };
+  }
   if (after >= dz.reserve && value >= b.price * pr.buyMin) { verdict = 'buy'; text = `КУПУЙ за $${b.price}`; }
   else if (after >= 0 && after + cap >= dz.reserve && value >= b.price * Math.max(1.15, pr.buyMin + 0.3)) { verdict = 'buy'; text = `КУПУЙ (за потреби заклади непотрібне)`; }
   else if (after >= 0 && value >= b.price * 1.3 && stage(s).unownedShare > 0.4) { verdict = 'buy'; text = `КУПУЙ, ризиковано: запас буде $${after}`; }
@@ -113,7 +122,7 @@ export function buyAdvice(s, pid, i, P, profileOf = null) {
       if (top > 1.15 && verdict === 'auction') reasons.push(`суперники зазвичай переплачують на аукціонах (×${top.toFixed(2)}): не бійся віддати, хай платять більше`);
     }
   }
-  return { idx: i, name: b.name, price: b.price, value, verdict, text, maxBid, reasons };
+  return { idx: i, name: b.name, price: b.price, value, verdict, text, maxBid, reasons, affordable: true };
 }
 
 export function auctionAdvice(s, pid, P, profileOf = null) {
@@ -427,7 +436,7 @@ export function analyze(s, pid, profileOf = null) {
   if (out.debt) out.now = { kind: 'debt', title: `Борг $${out.debt.short}: продай/заклади`, tone: 'bad' };
   else if (out.auction) out.now = { kind: 'auction', title: out.auction.text, tone: out.auction.verdict === 'bid' ? 'good' : 'neutral' };
   else if (out.trades.some((t) => t.role === 'incoming')) { const t = out.trades.find((x) => x.role === 'incoming'); out.now = { kind: 'trade', title: `Обмін від ${t.from}: ${t.text}`, tone: t.verdict === 'accept' ? 'good' : t.verdict === 'reject' ? 'bad' : 'neutral' }; }
-  else if (out.buy) out.now = { kind: 'buy', title: out.buy.text, tone: out.buy.verdict === 'buy' ? 'good' : 'neutral' };
+  else if (out.buy) out.now = { kind: 'buy', title: out.buy.text, tone: out.buy.verdict === 'buy' ? 'good' : out.buy.verdict === 'cant' ? 'bad' : 'neutral' };
   else if (out.jail) out.now = { kind: 'jail', title: out.jail.text, tone: 'neutral' };
   else if (myTurn && out.build.steps.length) out.now = { kind: 'build', title: `Будуй: ${out.build.steps[0].name} (${out.build.steps[0].from}→${out.build.steps[0].to})`, tone: 'good' };
   else if (myTurn) out.now = { kind: 'turn', title: s.cubesRolledInTurn ? 'Можна завершувати хід' : 'Кидай кубики', tone: 'neutral' };

@@ -35,7 +35,7 @@ const vComplete = valueOf(s, idxOf(s, 'Paris'), 'p0').value, vPlain = valueOf(s,
 ok('ділянка, що завершує набір, цінніша', vComplete > vPlain * 1.5, `${vComplete} vs ${vPlain}`);
 
 // 5. Мало грошей => аукціон
-s = makeState(); s.participants[0].money = 250; s.participants[0].position = idxOf(s, 'Paris'); s.cubesRolledInTurn = true;
+s = makeState(); s.participants[0].money = 400; s.participants[0].position = idxOf(s, 'Paris'); s.cubesRolledInTurn = true;
 own(s, 'p1', ['London', 'Liverpool', 'Manchester']); s.blocks[idxOf(s, 'London')].level = 3; s.blocks[idxOf(s, 'Liverpool')].level = 3; s.blocks[idxOf(s, 'Manchester')].level = 3;
 a = analyze(s, 'p0');
 ok('мало грошей + небезпека попереду => аукціон', a.buy && a.buy.verdict === 'auction', a.buy && a.buy.text + ' | запас ' + a.danger.reserve);
@@ -130,4 +130,13 @@ if (fails) { console.log(`\n${fails} FAIL`); process.exit(1); } else console.log
   const f = (o) => Object.entries(o).map(([k, v]) => k + ' ' + Math.round(v * 100) + '%').join(', ');
   ok('після їхнього обміну мій шанс падає', w.swap.p0 < w.base.p0, `до: ${f(w.base)} | після: ${f(w.swap)}`);
   if (fails) { console.log(fails + ' FAIL'); process.exit(1); } else console.log('Загрози: усе пройдено');
+}
+
+// ---- немає грошей на покупку ----
+{
+  let s = makeState(); s.participants[0].money = 150; s.participants[0].position = idxOf(s, 'Paris'); s.cubesRolledInTurn = true;
+  const a = analyze(s, 'p0');
+  ok('грошей менше за ціну: не радить купувати', a.buy.verdict === 'cant' && /Не вистачає \$130: заверши хід/.test(a.now.title), a.now.title);
+  ok('ставка на аукціоні не більша за гроші', a.buy.maxBid <= 140, String(a.buy.maxBid));
+  if (fails) { console.log(fails + ' FAIL'); process.exit(1); } else console.log('Немає грошей: усе пройдено');
 }

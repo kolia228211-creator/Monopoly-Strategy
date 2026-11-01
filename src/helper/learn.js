@@ -82,10 +82,12 @@ export function createLearner(storage, { now = () => Date.now() } = {}) {
   // Порада, показана зараз, — щоб пов'язати її з тим, що я зробив
   function noteAdvice(model, winBase) {
     if (!model) return;
-    if (model.buy) lastAdvice.buy = { idx: model.buy.idx, verdict: model.buy.verdict, maxBid: model.buy.maxBid, value: model.buy.value, win: winBase };
+    if (model.buy) lastAdvice.buy = { idx: model.buy.idx, verdict: model.buy.verdict, maxBid: model.buy.maxBid, value: model.buy.value, win: winBase, affordable: model.buy.affordable !== false, at: now() };
     if (model.auction) lastAdvice.auction = { idx: model.auction.idx, myMax: model.auction.myMax, win: winBase };
     (model.trades || []).forEach((t) => { if (t.role !== 'others') (lastAdvice.trades = lastAdvice.trades || {})[t.id] = { verdict: t.verdict, score: t.score, win: winBase }; });
   }
+  // порада про купівлю рахується лише для цієї ж клітинки й лише якщо показана щойно (не з минулого кола)
+  function freshBuy(i) { const b = lastAdvice.buy; return b && b.idx === i && now() - (b.at || 0) < 90000 ? b : null; }
   function decision(d) { if (game) { game.decisions.push({ t: now(), ...d }); dirty = true; } }
 
   function observe(s, meId, model, winBase) {
@@ -103,7 +105,7 @@ export function createLearner(storage, { now = () => Date.now() } = {}) {
       s.participants.forEach((p) => { auc.need[p.id] = completesFor(s, a.blockIndex, p.id); });
       const lp = byId(s, curId);
       if (lp) { prof(lp).buys.no++; out.push({ type: 'decline', who: lp.name, idx: a.blockIndex }); ev({ type: 'decline', who: playerKey(lp), idx: a.blockIndex, money: lp.money });
-        if (lp.id === meId) decision({ kind: 'buy', idx: a.blockIndex, action: 'auction', advice: lastAdvice.buy && lastAdvice.buy.idx === a.blockIndex ? lastAdvice.buy : null }); }
+        if (lp.id === meId) decision({ kind: 'buy', idx: a.blockIndex, action: 'auction', advice: freshBuy(a.blockIndex) }); }
     }
     if (a && auc && a.currentBidderId) auc.bids[a.currentBidderId] = Math.max(auc.bids[a.currentBidderId] || 0, a.currentBid || 0);
     if (!a && auc) {
@@ -131,7 +133,7 @@ export function createLearner(storage, { now = () => Date.now() } = {}) {
         if (!pb.ownerId && b.ownerId && !(P.auctionIdx === i) && !(recentAuction[i] > now())) {
           const p = byId(s, b.ownerId);
           if (p) { prof(p).buys.yes++; out.push({ type: 'buy', who: p.name, idx: i }); ev({ type: 'buy', who: playerKey(p), idx: i, price: b.price });
-            if (p.id === meId) decision({ kind: 'buy', idx: i, action: 'buy', advice: lastAdvice.buy && lastAdvice.buy.idx === i ? lastAdvice.buy : null }); }
+            if (p.id === meId) decision({ kind: 'buy', idx: i, action: 'buy', advice: freshBuy(i) }); }
         }
         if ((b.level || 0) > (pb.level || 0) && b.ownerId) { const p = byId(s, b.ownerId); if (p) { prof(p).houses += b.level - (pb.level || 0); ev({ type: 'build', who: playerKey(p), idx: i, level: b.level }); } }
         if (b.isMortgaged && !pb.isMortgaged && b.ownerId) { const p = byId(s, b.ownerId); if (p) { prof(p).mortgages++; ev({ type: 'mortgage', who: playerKey(p), idx: i }); } }
@@ -186,8 +188,9 @@ export function createLearner(storage, { now = () => Date.now() } = {}) {
   function stats() {
     const done = journal.filter((g) => g.end);
     const decs = journal.flatMap((g) => g.decisions);
-    const followed = decs.filter((d) => d.advice && ((d.kind === 'buy' && ((d.advice.verdict === 'buy') === (d.action === 'buy'))) || (d.kind === 'trade' && !d.cancelled && ((d.advice.verdict === 'accept') === d.accepted))));
-    const judged = decs.filter((d) => d.advice && (d.kind === 'buy' || (d.kind === 'trade' && !d.cancelled)));
+    const followed = decs.filter((d) => d.advice && (d.kind !== 'buy' || (d.advice.verdict !== 'cant' && d.advice.affordable !== false)) && ((d.kind === 'buy' && ((d.advice.verdict === 'buy') === (d.action === 'buy'))) || (d.kind === 'trade' && !d.cancelled && ((d.advice.verdict === 'accept') === d.accepted))));
+    const fair = (d) => d.kind !== 'buy' || (d.advice.verdict !== 'cant' && d.advice.affordable !== false);
+    const judged = decs.filter((d) => d.advice && fair(d) && (d.kind === 'buy' || (d.kind === 'trade' && !d.cancelled)));
     return { games: journal.length, finished: done.length, myWins: done.filter((g) => g.end.winner === g.me).length,
       decisions: decs.length, followRate: judged.length ? followed.length / judged.length : null, profiles: Object.keys(profiles).length };
   }

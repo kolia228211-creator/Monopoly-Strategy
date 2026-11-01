@@ -73,4 +73,16 @@ ok('панель: картка суперників', a.rivals && a.rivals.lengt
 const mem2 = new Map(); const L3 = createLearner(makeStorage({ getItem: (k) => mem2.get(k) ?? null, setItem: (k, v) => mem2.set(k, v) }));
 ok('імпорт журналу на іншому пристрої', L3.importData(JSON.parse(JSON.stringify(L2.exportData()))) && L3.stats().games === 1 && L3.profileFor(s.participants[3]).auctionN === 2);
 
+// «не вистачає грошей» не псує відсоток дотриманих порад
+{
+  const mem3 = new Map(); let c3 = 5e6; const L4 = createLearner(makeStorage({ getItem: (k) => mem3.get(k) ?? null, setItem: (k, v) => mem3.set(k, v) }), { now: () => c3 });
+  let x = makeState(); x.stats = { startedAt: 7 }; const par = idxOf(x, 'Paris');
+  L4.observe(x, 'p0', null, 0.2);
+  x = JSON.parse(JSON.stringify(x)); x.participants[0].position = par; x.cubesRolledInTurn = true; c3 += 1000;
+  L4.observe(x, 'p0', { buy: { idx: par, verdict: 'cant', maxBid: 0, value: 300, affordable: false } }, 0.2);
+  x = JSON.parse(JSON.stringify(x)); x.auction = { blockIndex: par, currentBid: 0, currentBidderId: null, bidderIds: ['p0', 'p1'], state: 'active' }; c3 += 1000;
+  L4.observe(x, 'p0', null, 0.2);
+  const st4 = L4.stats();
+  ok('«не вистачає грошей» не рахується як недотримана порада', st4.decisions === 1 && st4.followRate === null, JSON.stringify(st4));
+}
 if (fails) { console.log(fails + ' FAIL'); process.exit(1); } else console.log('\nНавчання: усе пройдено');
