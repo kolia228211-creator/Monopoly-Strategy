@@ -1,20 +1,23 @@
 {
- "_comment": "Усі правила симулятора. status: exact = з налаштувань/скрінів користувача; placeholder = заглушка (класична Монополія). Змініть цифри й запустіть: python3 sim/run_all.py",
+ "_comment": "Усі правила симулятора. Якщо в data/board-classic.json verified.rents/cards=true і є rules.goReward — оренди, ціни будинків, колоди, бонус START, тюрма (кількість ходів) і пропуск ходу на Vacation беруться ЗВІДТИ, а поля нижче — запасні заглушки. status: exact = точно (з сервера richup 01.11.2026 або з налаштувань кімнати); placeholder = заглушка (класична Монополія). Після змін: python3 sim/run_all.py",
  "boardFile": "data/board-classic.json",
  "status": {
   "board_layout_prices": "exact",
   "settings": "exact",
-  "streetRents": "placeholder",
-  "housePrice": "placeholder",
-  "airportRent": "placeholder",
-  "utilityMultipliers": "placeholder",
-  "cards": "placeholder",
-  "startBonus": "placeholder",
-  "prison": "placeholder",
+  "streetRents": "exact (board, server 01.11.2026)",
+  "housePrice": "exact (board)",
+  "hotelPrice": "exact (= ціна будинку)",
+  "airportRent": "exact (board)",
+  "utilityMultipliers": "placeholder (4x/10x)",
+  "cards": "exact (board, 17+17)",
+  "startBonus": "exact (+200 прохід, +300 точно)",
+  "prison": "partly: 3 ходи exact; вихід $50 placeholder",
+  "vacationSkip": "exact (1 хід)",
   "earningsTax": "placeholder (10% від готівки)",
-  "houseLimit": "placeholder",
+  "houseLimit": "placeholder (32/12)",
   "mortgage": "exact (50%)",
-  "unmortgage": "placeholder",
+  "unmortgage": "placeholder (55%)",
+  "nearestCardRent": "placeholder (як у класиці: аеропорт x2, комунальна 10x)",
   "doubleRentOnFullSet": "unknown -> рахуємо обидва"
  },
  "startingCash": 1500,
@@ -367,5 +370,7 @@
     "amount": 100
    }
   ]
- }
+ },
+ "nearestCardClassicRent": true,
+ "vacationSuspensionTurns": 1
 }

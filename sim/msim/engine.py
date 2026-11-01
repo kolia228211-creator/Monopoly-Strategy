@@ -31,7 +31,7 @@ class Game:
         self.r, self.pre, self.S, self.rng = r, pre, strategies, rng
         n = self.n = len(strategies)
         self.cash = [r.cfg["startingCash"]]*n
-        self.pos = [0]*n; self.alive = [True]*n; self.jail = [-1]*n; self.goojf = [0]*n
+        self.pos = [0]*n; self.alive = [True]*n; self.jail = [-1]*n; self.goojf = [0]*n; self.skip = [0]*n
         self.owner = [-1]*40; self.houses = [0]*40; self.mort = [False]*40
         self.pot = 0; self.hleft = r.cfg["houseLimit"]; self.Hleft = r.cfg["hotelLimit"]
         self.vac = r.cfg["vacationCash"] if vacation is None else vacation
@@ -159,6 +159,7 @@ class Game:
     def rent_due(self, i, dice, special=None):
         r = self.r; o = self.owner[i]
         if self.mort[i]: return 0
+        if not r.cfg.get("nearestCardClassicRent", True): special = None
         t = r.types[i]
         if t=="street":
             g=r.group[i]; return r.street_rent(i, self.houses[i], self.owns_set(o,g))
@@ -184,6 +185,7 @@ class Game:
             amt = int(self.cash[p]*r.cfg["earningsTaxPercent"]/100) if "percent" in sq else r.cfg["premiumTax"]
             self.pay_bank(p, amt)
         elif t=="vacation":
+            if r.vac_skip: self.skip[p] = r.vac_skip      # Vacation забирає наступний хід
             if self.vac and self.pot>0:
                 self.cash[p]+=self.pot; self.stats["vac_paid"][p]+=self.pot; self.pot=0
         elif t=="gotoprison": self.to_jail(p)
@@ -297,6 +299,8 @@ class Game:
         r = self.r
         self.try_trade(p)
         if not self.alive[p]: return
+        if self.skip[p] > 0:                              # пропуск ходу (Vacation)
+            self.skip[p] -= 1; self.build(p); return
         if self.jail[p] >= 0:
             if self.jail_leave_now(p):
                 if self.goojf[p]>0: self.goojf[p]-=1
@@ -319,7 +323,7 @@ class Game:
             np_ = (self.pos[p]+a+b)%40
             if np_ < self.pos[p] and np_!=0: self.cash[p]+=r.cfg["passStartBonus"]
             self.pos[p]=np_; self.land(p,a+b)
-            if self.jail[p]>=0 or a!=b: break
+            if self.jail[p]>=0 or a!=b or self.skip[p]>0: break
             d+=1
         if self.alive[p]: self.build(p)
     def play(self):

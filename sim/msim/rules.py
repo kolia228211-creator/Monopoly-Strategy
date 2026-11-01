@@ -7,6 +7,20 @@ GROUP_UA = {"brazil":"Бразилія","israel":"Ізраїль","italy":"Іт�
 CLASSIC_ANALOG = {"brazil":"коричневі","israel":"блакитні","italy":"рожеві","germany":"помаранчеві",
                   "china":"червоні","france":"жовті","uk":"зелені","usa":"сині"}
 
+def convert_card(c):
+    """Картка з data/board-classic.json (формат richup) -> формат симулятора."""
+    if "earn" in c: return {"t":"money","amount":c["earn"]}
+    if "pay" in c: return {"t":"money","amount":-c["pay"]}
+    if "collectFromEach" in c: return {"t":"collecteach","amount":c["collectFromEach"]}
+    if "payEach" in c: return {"t":"payeach","amount":c["payEach"]}
+    if "repairs" in c: return {"t":"repairs","house":c["repairs"][0],"hotel":c["repairs"][1]}
+    if c.get("goToPrison"): return {"t":"jail"}
+    if c.get("pardon"): return {"t":"jailfree"}
+    if "moveTo" in c: return {"t":"move","to":c["moveTo"]}
+    if "moveToNext" in c: return {"t":"nearest","kind":"utility" if c["moveToNext"]=="company" else "airport"}
+    if "moveSteps" in c: return {"t":"back","steps":-c["moveSteps"]}
+    raise ValueError(c)
+
 class Rules:
     def __init__(self, cfg_path=None, overrides=None):
         cfg_path = cfg_path or os.path.join(ROOT, "sim", "config", "rules.json")
@@ -41,6 +55,18 @@ class Rules:
         self.utilities = self.groups.get("utility", [])
         self.ownable = [i for i in range(40) if self.types[i] in ("street","airport","utility")]
         self.cards = cfg["cards"]
+        self.cards_from_board = False
+        if board.get("verified",{}).get("cards") and board.get("cards"):
+            self.cards = {k: [convert_card(c) for c in v] for k,v in board["cards"].items()}
+            self.cards_from_board = True
+        br = board.get("rules", {})
+        self.start_from_board = False
+        if br.get("goReward"):
+            cfg["passStartBonus"] = br["goReward"].get("pass", cfg["passStartBonus"])
+            cfg["landStartBonus"] = br["goReward"].get("land", cfg["landStartBonus"])
+            self.start_from_board = True
+        self.vac_skip = int(br.get("vacationSuspensionTurns", cfg.get("vacationSuspensionTurns", 0)))
+        if br.get("prisonSuspensionTurns"): cfg["prison"]["maxTurns"] = int(br["prisonSuspensionTurns"])
         self.jail = self.types.index("prison")
         self.gotojail = self.types.index("gotoprison")
         self.vacation = self.types.index("vacation") if "vacation" in self.types else None

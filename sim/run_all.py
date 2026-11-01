@@ -23,7 +23,10 @@ def main():
 def export_summary(r, A, mc, names, path):
     """Машинно-зчитуваний підсумок для браузерного помічника («мозок»)."""
     gt = A["gt"]; T, buy, swap = A["trade"]
-    d = {"landingPerTurn": {"leave": list(map(float, A["st"]["leave"]["land"])), "stay": list(map(float, A["st"]["stay"]["land"]))},
+    d = {"dataSource": {"rents": "board (server)" if r.rents_from_board else "placeholder",
+                        "cards": "board (server)" if getattr(r,"cards_from_board",False) else "placeholder",
+                        "status": r.cfg.get("status", {}), "vacationSkipTurns": getattr(r,"vac_skip",0)},
+         "landingPerTurn": {"leave": list(map(float, A["st"]["leave"]["land"])), "stay": list(map(float, A["st"]["stay"]["land"]))},
          "groups": {g: {"income": gt[g]["inc"], "payback": gt[g]["payback"], "Wper25": gt[g]["Wper"], "T": T[g],
                         "maxPayLast4p": buy[g]["max_pay"][4], "sellerAsk": buy[g]["ask"]} for g in r.street_groups},
          "formulas": {"valuation": "V = P*m_stage (+0.5*T if completes mine) (+0.35*25*I3 if blocks one opponent); m=1.15/1.0/0.8",
