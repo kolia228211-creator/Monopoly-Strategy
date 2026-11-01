@@ -65,7 +65,8 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
   }
   function scheduleSim(s, m) {
     if (s.phase === 'lobby' || s.winnerId) return;
-    const sig = signature(s); if (sig === lastSig) return; lastSig = sig;
+    const sig = signature(s) + '|b' + (m.buy ? m.buy.idx : '') + '|p' + s.participants.map((p) => p.position).join(',');
+    if (sig === lastSig) return; lastSig = sig;
     clearTimeout(simTimer);
     const my = ++simToken;
     H.sim = Object.assign({}, H.sim || {}, { busy: true });

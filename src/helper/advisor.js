@@ -15,7 +15,7 @@ export function stage(s) {
   return { unownedShare: share, mult: share > 0.6 ? 1.15 : share > 0.25 ? 1 : 0.8, name: share > 0.6 ? 'рання' : share > 0.25 ? 'середина' : 'пізня' };
 }
 
-const nOpp = (s) => Math.max(1, alivePlayers(s).length - 1);
+const nOpp = (s) => Math.max(1, (s.phase === 'lobby' ? Math.max(alivePlayers(s).length, s.settings?.maxPlayers || 4) : alivePlayers(s).length) - 1);
 
 // Дохід набору за один хід ОДНОГО суперника при рівні L на всіх містах
 export function groupIncome(s, key, L, P = boardProbs(s).leave) {
