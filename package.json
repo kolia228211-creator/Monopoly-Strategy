@@ -1,12 +1,13 @@
 {
   "name": "monopoly-strategy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Помічник для richup.io: записувач гри, аналітика, підказки",
   "type": "module",
   "scripts": {
     "build": "node tools/build.mjs && node tools/build-helper.mjs",
-    "test": "node tools/test-engine.mjs && node tools/test-recorder.mjs && node tools/test-helper.mjs"
+    "test": "node tools/test-engine.mjs && node tools/test-learn.mjs && node tools/test-recorder.mjs && node tools/test-helper.mjs",
+    "journal": "node tools/analyze-journal.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",

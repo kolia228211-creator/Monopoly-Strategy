@@ -81,7 +81,7 @@ function mortgageCapacity(s, pid, exceptIdx = -1) {
   return v;
 }
 
-export function buyAdvice(s, pid, i, P) {
+export function buyAdvice(s, pid, i, P, profileOf = null) {
   const me = s.participants.find((p) => p.id === pid), b = s.blocks[i];
   const { value, why } = valueOf(s, i, pid, P), dz = danger(s, pid);
   const after = me.money - b.price, cap = mortgageCapacity(s, pid);
@@ -94,16 +94,32 @@ export function buyAdvice(s, pid, i, P) {
   const reasons = [...why];
   reasons.push(`цінність для тебе ≈ $${value} (ціна $${b.price}, ${stage(s).name} гра)`);
   reasons.push(`після покупки: $${after}, безпечний запас $${dz.reserve}`);
+  if (profileOf) {
+    const meds = alivePlayers(s).filter((p) => p.id !== pid).map(profileOf).filter((x) => x && x.auctionN >= 3 && x.auctionMed);
+    if (meds.length) {
+      const top = Math.max(...meds.map((x) => x.auctionMed));
+      if (top < 0.85 && verdict === 'buy') reasons.push(`суперники на аукціонах зазвичай дають до ×${top.toFixed(2)} ціни: аукціон може бути дешевшим, але ризикуєш віддати`);
+      if (top > 1.15 && verdict === 'auction') reasons.push(`суперники зазвичай переплачують на аукціонах (×${top.toFixed(2)}): не бійся віддати, хай платять більше`);
+    }
+  }
   return { idx: i, name: b.name, price: b.price, value, verdict, text, maxBid, reasons };
 }
 
-export function auctionAdvice(s, pid, P) {
+export function auctionAdvice(s, pid, P, profileOf = null) {
   const a = s.auction; if (!a || a.state === 'ended') return null;
   const i = a.blockIndex, b = s.blocks[i];
   const me = s.participants.find((p) => p.id === pid);
   const est = alivePlayers(s).map((p) => {
     const { value } = valueOf(s, i, p.id, P);
-    return { id: p.id, name: p.name, max: Math.max(0, Math.min(value, p.money - 40)), isMe: p.id === pid };
+    let max = Math.min(value, p.money - 40), learned = null;
+    const pr = p.id !== pid && profileOf ? profileOf(p) : null;
+    if (pr && pr.auctionN >= 2 && pr.auctionP75) {
+      const need = b.type === 'city' && groupIndices(s, b.countryId).filter((j) => j !== i).every((j) => s.blocks[j].ownerId === p.id);
+      learned = Math.round(b.price * pr.auctionP75 * (need ? 1.3 : 1));
+      const w = pr.auctionN >= 6 ? 0.75 : 0.5;
+      max = Math.min(p.money, Math.round(w * learned + (1 - w) * max));
+    }
+    return { id: p.id, name: p.name, max: Math.max(0, Math.round(max)), isMe: p.id === pid, learned, n: pr ? pr.auctionN : 0 };
   }).sort((x, y) => y.max - x.max);
   const mine = est.find((e) => e.isMe);
   const myMax = mine ? mine.max : 0;
@@ -166,7 +182,7 @@ export function describeOffer(s, o) {
   return parts.length ? parts.join(' + ') : 'нічого';
 }
 
-export function tradeAdvice(s, pid, t, P) {
+export function tradeAdvice(s, pid, t, P, profileOf = null) {
   const after = applyTrade(s, t);
   const other = t.initiatorId === pid ? t.recipientId : t.recipientId === pid ? t.initiatorId : null;
   const name = (id) => s.participants.find((p) => p.id === id)?.name || '?';
@@ -198,13 +214,20 @@ export function tradeAdvice(s, pid, t, P) {
   if (floor && (theirOffer.money || 0) < floor) { res.verdict = 'reject'; }
   res.minAskIfReject = res.verdict === 'reject' ? Math.round(Math.max(floor, (theirOffer.money || 0) - score / 1.6)) : null;
   res.fairOk = tradeFairnessOk(s, pid, myOffer, theirOffer);
+  if (role === 'outgoing' && profileOf) {
+    const op = s.participants.find((p) => p.id === other), pr = op ? profileOf(op) : null;
+    if (pr && pr.tradeN >= 2) {
+      res.acceptHint = pr.minAcceptGain != null && res.dOther >= pr.minAcceptGain
+        ? `${op.name} раніше погоджувався на схожі (${pr.tradeAcc}/${pr.tradeN})` : `${op.name} зазвичай хоче більше: приймав від +$${pr.minAcceptGain ?? '?'} вигоди (${pr.tradeAcc}/${pr.tradeN})`;
+    }
+  }
   res.text = res.verdict === 'accept' ? 'ПРИЙМАЙ' : res.verdict === 'neutral' ? 'Майже рівно, дивись на % перемоги' : 'ВІДХИЛЯЙ';
   res.after = after;
   return res;
 }
 
 // Ідеї обмінів: докупити останню ділянку набору / обмін 1↔1
-export function tradeIdeas(s, pid, P) {
+export function tradeIdeas(s, pid, P, profileOf = null) {
   const ideas = [], groups = [...new Set(s.blocks.filter((b) => b.type === 'city').map((b) => b.countryId))];
   const me = s.participants.find((p) => p.id === pid); if (!me) return ideas;
   const needs = []; // [group, missingIdx, ownerId]
@@ -223,7 +246,9 @@ export function tradeIdeas(s, pid, P) {
     const n = groupIndices(s, g).length, buildCash = b.housePrice * n;
     const cap = Math.min(buyerMax, me.money - Math.max(100, buildCash));
     const open = Math.round(b.price * 1.5 / 10) * 10;
-    if (cap >= open) ideas.push({ kind: 'buy', text: `Купи ${b.name} у ${qn}: почни з ~$${open}, стеля $${cap} (лишиться на будинки). Для нього чесна ціна ~$${sellerAsk}`, group: g, gain: T });
+    const pr = profileOf ? profileOf(s.participants.find((p) => p.id === q) || {}) : null;
+    const habit = pr && pr.tradeN >= 2 ? ` (${qn} прийняв ${pr.tradeAcc} з ${pr.tradeN} обмінів)` : '';
+    if (cap >= open) ideas.push({ kind: 'buy', text: `Купи ${b.name} у ${qn}: почни з ~$${open}, стеля $${cap} (лишиться на будинки). Для нього чесна ціна ~$${sellerAsk}${habit}`, group: g, gain: T });
     else ideas.push({ kind: 'buy-hard', text: `${b.name} (у ${qn}) завершить ${groupName(g)}, варта до $${buyerMax}. Зараз грошей замало: краще обмін ділянками`, group: g, gain: T });
   }
   // Обмін 1↔1: у суперника бракує моєї ділянки, а в мене його
@@ -351,23 +376,24 @@ export function groupTable(s, P) {
 }
 
 /** Головна функція: повний аналіз для панелі. */
-export function analyze(s, pid) {
+export function analyze(s, pid, profileOf = null) {
   const P = boardProbs(s).leave;
   const me = s.participants.find((p) => p.id === pid) || null;
   const cur = currentPlayer(s);
   const myTurn = !!(me && cur && cur.id === pid);
   const out = { phase: s.phase, myTurn, meId: me ? pid : null, players: playersSummary(s, pid), stage: stage(s) };
   if (s.phase === 'lobby') { out.groups = groupTable(s, P); return out; }
-  if (!me || me.bankruptedAt) { out.trades = (s.trades || []).filter((t) => t.status === 'pending').map((t) => tradeAdvice(s, pid, t, P)); return out; }
+  if (!me || me.bankruptedAt) { out.trades = (s.trades || []).filter((t) => t.status === 'pending').map((t) => tradeAdvice(s, pid, t, P, profileOf)); return out; }
   out.danger = danger(s, pid);
   out.debt = debtPlan(s, pid, P);
-  out.auction = auctionAdvice(s, pid, P);
-  out.trades = (s.trades || []).filter((t) => !t.status || t.status === 'pending').map((t) => tradeAdvice(s, pid, t, P));
+  out.auction = auctionAdvice(s, pid, P, profileOf);
+  out.trades = (s.trades || []).filter((t) => !t.status || t.status === 'pending').map((t) => tradeAdvice(s, pid, t, P, profileOf));
   out.jail = myTurn && !s.cubesRolledInTurn ? jailAdvice(s, pid) : null;
   const here = s.blocks[me.position];
-  if (myTurn && s.cubesRolledInTurn && isBuyable(here) && !here.ownerId && !out.auction) out.buy = buyAdvice(s, pid, me.position, P);
+  if (myTurn && s.cubesRolledInTurn && isBuyable(here) && !here.ownerId && !out.auction) out.buy = buyAdvice(s, pid, me.position, P, profileOf);
   out.build = buildPlan(s, pid, P);
-  out.ideas = tradeIdeas(s, pid, P);
+  out.ideas = tradeIdeas(s, pid, P, profileOf);
+  if (profileOf) out.rivals = s.participants.filter((p) => p.id !== pid).map((p) => ({ name: p.name, color: p.appearance, isBot: p.isBot, ...(profileOf(p) || {}) }));
   // Головна порада зараз
   if (out.debt) out.now = { kind: 'debt', title: `Борг $${out.debt.short}: продай/заклади`, tone: 'bad' };
   else if (out.auction) out.now = { kind: 'auction', title: out.auction.text, tone: out.auction.verdict === 'bid' ? 'good' : 'neutral' };

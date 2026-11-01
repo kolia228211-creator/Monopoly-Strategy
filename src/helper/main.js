@@ -3,6 +3,7 @@
 import { analyze } from './advisor.js';
 import { winProbsAsync } from './sim.js';
 import { createUI } from './ui.js';
+import { createLearner, makeStorage } from './learn.js';
 
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
 
@@ -10,6 +11,15 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
   if (window.__RUHELP) { window.__RUHELP.ui.show(); return; }
   const H = window.__RUHELP = { version: VERSION, store: null, unsub: null, model: null, sim: null };
   const ui = H.ui = createUI(VERSION);
+  let ls = null; try { ls = window.localStorage; } catch (e) { ls = null; }
+  const learner = H.learner = createLearner(makeStorage(ls));
+  const profileOf = (p) => learner.profileFor(p);
+  ui.setStats(learner.stats());
+  ui.hooks.onExport = () => { learner.flush(); ui.download('richup-zhurnal-' + new Date().toISOString().slice(0, 10) + '.json', learner.exportData()); };
+  ui.hooks.onImport = (d) => { const ok = learner.importData(d); ui.setStats(learner.stats()); if (ok) update(); return ok; };
+  let flushTimer = null;
+  const DESC = { decline: (e) => `${e.who} не купив`, buy: (e) => `${e.who} купив`, 'auction-end': (e) => `аукціон: ${e.winner || 'ніхто'} за $${e.price}`,
+    'trade-accepted': (e) => `${e.to} прийняв обмін`, 'trade-rejected': (e) => `${e.to} відхилив обмін`, bankrupt: (e) => `${e.who} збанкрутував`, 'game-end': () => 'партію збережено в журнал' };
 
   function findStore() {
     const el = document.getElementById('app'); if (!el) return null;
@@ -90,7 +100,13 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
     try {
       const g = H.store.getState(), s = g.state;
       if (!s || !s.blocks || !s.blocks.length) { ui.status('Чекаю завантаження гри…'); return; }
-      H.model = analyze(s, g.selfParticipantId);
+      H.model = analyze(s, g.selfParticipantId, profileOf);
+      try {
+        const evs = learner.observe(s, g.selfParticipantId, H.model, H.sim && H.sim.base ? H.sim.base[g.selfParticipantId] : null);
+        const txt = evs.filter((e) => DESC[e.type]).map((e) => DESC[e.type](e));
+        if (txt.length) { ui.learned(txt); ui.setStats(learner.stats()); }
+        clearTimeout(flushTimer); flushTimer = setTimeout(() => learner.flush(), 1500);
+      } catch (e) { console.warn('[RU помічник] навчання', e); }
       scheduleSim(s, H.model);
       draw();
     } catch (e) {
@@ -116,6 +132,7 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
     try { const s = H.store && H.store.getState().state; ok = !!(s && s.blocks && (!room || s.id === room)); } catch (e) { ok = false; }
     if (!ok) { H.store = null; attach(); }
   }, 2000);
-  H.stop = () => { clearInterval(H.timer); if (H.unsub) H.unsub(); ui.host.remove(); delete window.__RUHELP; };
+  window.addEventListener('pagehide', () => learner.flush());
+  H.stop = () => { learner.flush(); clearInterval(H.timer); if (H.unsub) H.unsub(); ui.host.remove(); delete window.__RUHELP; };
   console.log('[RU помічник] v' + VERSION + ' запущено');
 })();

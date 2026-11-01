@@ -45,6 +45,7 @@ ul { margin: 0; padding-left: 16px; display: grid; gap: 2px; } li { color: #d9d4
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } .bar > span { transition: none; } }
 .ft { padding: 6px 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; gap: 8px; }
 .ft button { all: unset; cursor: pointer; color: var(--accent); }
+.kv .nm { display: flex; align-items: center; gap: 6px; }
 `;
 
 export function createUI(version) {
@@ -54,9 +55,13 @@ export function createUI(version) {
   root.innerHTML = `<style>${CSS}</style><div class="panel"><div class="hd"><b>🎲 Помічник</b><span class="now"></span>
     <button data-a="min" title="Згорнути">▾</button><button data-a="close" title="Закрити">✕</button></div>
     <div class="bd"><div class="card"><div class="mut">Шукаю гру на сторінці…</div></div></div>
-    <div class="ft"><span>v${esc(version)}</span><span class="upd"></span></div></div>`;
+    <div class="ft"><span>v${esc(version)} · <span class="stats"></span></span><span><button data-a="exp" title="Зберегти журнал і профілі у файл">⤓ журнал</button> <button data-a="imp" title="Завантажити журнал/профілі з файлу">⤒</button> <span class="upd"></span></span></div>
+    <input type="file" accept="application/json,.json" hidden></div>`;
   (document.body || document.documentElement).appendChild(host);
-  const panel = root.querySelector('.panel'), bd = root.querySelector('.bd'), nowEl = root.querySelector('.now'), upd = root.querySelector('.upd');
+  const panel = root.querySelector('.panel'), bd = root.querySelector('.bd'), nowEl = root.querySelector('.now'), upd = root.querySelector('.upd'), statsEl = root.querySelector('.stats');
+  const fileIn = root.querySelector('input[type=file]');
+  const learnedLog = [];
+  const hooks = { onExport: null, onImport: null };
   const st = load();
   const isMob = () => window.innerWidth < 760;
   function place() {
@@ -70,6 +75,12 @@ export function createUI(version) {
     const a = e.target.closest('[data-a]')?.dataset.a;
     if (a === 'min') { st.min = !st.min; save(st); place(); }
     if (a === 'close') { host.style.display = 'none'; }
+    if (a === 'exp' && hooks.onExport) hooks.onExport();
+    if (a === 'imp') fileIn.click();
+  });
+  fileIn.addEventListener('change', () => {
+    const f = fileIn.files && fileIn.files[0]; if (!f) return;
+    f.text().then((t) => { let ok = false; try { ok = hooks.onImport && hooks.onImport(JSON.parse(t)); } catch (e) { ok = false; } statsEl.textContent = ok ? 'імпортовано ✓' : 'не той файл'; fileIn.value = ''; });
   });
   // Перетягування (ПК)
   const hd = root.querySelector('.hd'); let drag = null;
@@ -106,7 +117,7 @@ export function createUI(version) {
       }
       if (m.now.kind === 'auction' && m.auction) {
         extra.push(`<li>${esc(m.auction.name)}: ставка ${money(m.auction.current)}, ціна ${money(m.auction.price)}</li>`);
-        m.auction.est.slice(0, 4).forEach((e) => extra.push(`<li>${esc(e.name)}${e.isMe ? ' (ти)' : ''}: готовий до ~${money(e.max)}</li>`));
+        m.auction.est.slice(0, 4).forEach((e) => extra.push(`<li>${esc(e.name)}${e.isMe ? ' (ти)' : ''}: готовий до ~${money(e.max)}${e.learned ? ` <span class="pill">досвід ${e.n}</span>` : ''}</li>`));
         if (m.auction.pushTip) extra.push(`<li>${esc(m.auction.pushTip)}</li>`);
       }
       if (m.now.kind === 'jail' && m.jail) m.jail.reasons.forEach((r) => extra.push(`<li>${esc(r)}</li>`));
@@ -129,6 +140,7 @@ export function createUI(version) {
         <ul>${wt != null ? `<li>Шанс перемоги після обміну: <b>${pct(wt)}</b> ${delta(wt - base)}</li>` : ''}
         <li>Для тебе ${t.dMe >= 0 ? '+' : ''}${money(t.dMe)}, для нього ${t.dOther >= 0 ? '+' : ''}${money(t.dOther)} (з потенціалом наборів)</li>
         ${t.verdict !== 'reject' ? `<li>Максимум, що варто доплатити: ${money(t.maxExtraPay)}</li>` : `<li>Погоджуйся, якщо дадуть ~${money(t.minAskIfReject)}</li>`}
+        ${t.acceptHint ? `<li>${esc(t.acceptHint)}</li>` : ''}
         ${t.fairOk === false ? '<li>⚠️ Сервер може відхилити: правило чесного обміну (публічна кімната)</li>' : ''}</ul>`}</div>`;
     });
     if (m.build && (m.build.steps.length || m.build.sets.length) && m.now?.kind !== 'debt') {
@@ -145,10 +157,26 @@ export function createUI(version) {
       <div class="kv"><span class="mut">Очікувана плата</span><span>${money(m.danger.expected)}</span></div>
       <div class="kv"><span class="mut">Найгірше</span><span>${money(m.danger.worst)}${m.danger.worst ? ` (${esc(m.danger.worstName)})` : ''}</span></div>
       <div class="kv"><span class="mut">Тримай у запасі</span><span><b>${money(m.danger.reserve)}</b></span></div></div>`;
+    if (m.rivals && m.rivals.length) {
+      const fx = (v) => (v == null ? '—' : '×' + v.toFixed(2));
+      h += `<div class="card"><div class="ttl"><span>Суперники (навчання)</span><span>ігор</span></div>${m.rivals.map((r) => `<div class="kv"><span class="nm"><span class="dot" style="display:inline-block;background:${esc(r.color || '#888')}"></span> ${esc(r.name)}${r.isBot ? ' <i>бот</i>' : ''}</span><span class="mut">${r.games || 0}</span></div>
+        <div class="mut">${r.auctionN ? `аукціон ${fx(r.auctionMed)}…${fx(r.auctionP75)} (${r.auctionN})` : 'аукціони: ще не бачив'} · ${r.buyN ? `купує ${Math.round(r.buyRate * 100)}% (${r.buyN})` : 'купівлі: —'} · ${r.tradeN ? `обміни ${r.tradeAcc}/${r.tradeN}` : 'обміни: —'}${r.houses ? ` · будинків ${r.houses}` : ''}</div>`).join('')}
+        ${learnedLog.length ? `<div class="mut">Щойно: ${learnedLog.map(esc).join(' · ')}</div>` : ''}</div>`;
+    }
     if (!m.meId && m.phase !== 'lobby') h += `<div class="card mut">Ти глядач: показую шанси всіх гравців.</div>`;
     bd.innerHTML = h || '<div class="card mut">Немає даних</div>';
     upd.textContent = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
   function status(text) { bd.innerHTML = `<div class="card"><div class="mut">${esc(text)}</div></div>`; nowEl.textContent = ''; }
-  return { host, render, status, show() { host.style.display = ''; } };
+  function learned(list) { list.forEach((t) => { learnedLog.unshift(t); }); learnedLog.splice(3); }
+  function setStats(st) {
+    if (!st) return;
+    statsEl.textContent = `партій ${st.games}` + (st.followRate != null ? ` · порад дотримано ${Math.round(st.followRate * 100)}%` : '');
+  }
+  function download(name, data) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })); a.download = name;
+    (document.body || document.documentElement).appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  return { host, render, status, learned, setStats, download, hooks, show() { host.style.display = ''; } };
 }
