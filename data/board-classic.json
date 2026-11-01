@@ -6,7 +6,7 @@
   "prices": true,
   "rents": true,
   "cards": true,
-  "utilities": false,
+  "utilities": true,
   "prisonFee": false
  },
  "settings": {
@@ -173,7 +173,11 @@
    "i": 12,
    "name": "Power Company",
    "type": "utility",
-   "price": 150
+   "price": 150,
+   "rentMultiplier": [
+    4,
+    10
+   ]
   },
   {
    "i": 13,
@@ -372,7 +376,11 @@
    "i": 27,
    "name": "Water Company",
    "type": "utility",
-   "price": 150
+   "price": 150,
+   "rentMultiplier": [
+    4,
+    10
+   ]
   },
   {
    "i": 28,
@@ -538,7 +546,12 @@
   "prisonSuspensionTurns": 3,
   "vacationSuspensionTurns": 1,
   "hotelPriceEqualsHousePrice": true,
-  "utilities": "невідомо (у даних блоку немає rentPrices); ймовірно 4x/10x суми кубиків",
+  "utilities": {
+   "oneOwned": 4,
+   "twoOwned": 10,
+   "unit": "x сума кубиків",
+   "source": "картка Power Company на сайті; Water Company так само (підтвердив користувач)"
+  },
   "prisonFee": "невідомо (є дія pay-out-of-prison); ймовірно $50",
   "auctionBidSteps": [
    2,
