@@ -223,7 +223,9 @@ export function tradeAdvice(s, pid, t, P, profileOf = null) {
     const b = s.blocks[i];
     if (b?.type === 'city' && setOwner(after, b.countryId) === other) floor += b.price + prT.deny * Math.max(0, groupT(s, b.countryId, P));
   }
-  if (floor && (theirOffer.money || 0) < floor) { res.verdict = 'reject'; }
+  // обмін, де я теж збираю набір: правило floor можна вимкнути (floorInSwap = 0)
+  const iGetSet = (theirOffer.propertyIndices || []).some((i) => s.blocks[i]?.type === 'city' && setOwner(after, s.blocks[i].countryId) === pid && setOwner(s, s.blocks[i].countryId) !== pid);
+  if (floor && !(iGetSet && prT.floorInSwap < 0.5) && (theirOffer.money || 0) < floor) { res.verdict = 'reject'; }
   res.minAskIfReject = res.verdict === 'reject' ? Math.round(Math.max(floor, (theirOffer.money || 0) - score / 1.6)) : null;
   res.fairOk = tradeFairnessOk(s, pid, myOffer, theirOffer);
   if (role === 'outgoing' && profileOf) {
@@ -257,7 +259,7 @@ export function tradeIdeas(s, pid, P, profileOf = null) {
     // після покупки мають лишитися гроші хоча б на 1 будинок на кожну ділянку набору
     const n = groupIndices(s, g).length, buildCash = b.housePrice * n * Math.max(0.5, prI.buildCashLots);
     const cap = Math.min(buyerMax, me.money - Math.max(100, buildCash));
-    const open = Math.round(b.price * 1.5 / 10) * 10;
+    const open = Math.round(b.price * prI.openMult / 10) * 10;
     const pr = profileOf ? profileOf(s.participants.find((p) => p.id === q) || {}) : null;
     const habit = pr && pr.tradeN >= 2 ? ` (${qn} прийняв ${pr.tradeAcc} з ${pr.tradeN} обмінів)` : '';
     if (cap >= open) ideas.push({ kind: 'buy', text: `Купи ${b.name} у ${qn}: почни з ~$${open}, стеля $${cap} (лишиться на будинки). Для нього чесна ціна ~$${sellerAsk}${habit}`, group: g, gain: T });
@@ -300,6 +302,10 @@ export function buildPlan(s, pid, P, budgetOverride) {
   const prB = PR(s), round = Math.floor((s.stats?.turnsCount || 0) / Math.max(1, alivePlayers(s).length));
   const bReserve = Math.max(dz.reserve, Math.round(prB.bRes + prB.bResGrow * round));
   let budget = budgetOverride ?? (me.money - bReserve);
+  // self-play (mortForBuild): закласти ділянки поза наборами, щоб будувати швидше
+  const hasSet = s.blocks.some((b, i) => b.type === 'city' && b.ownerId === pid && setOwner(s, b.countryId) === pid && canUpgrade(s, i, pid));
+  const mortCash = budgetOverride == null && prB.mortForBuild >= 0.5 && hasSet ? Math.round(mortgageCapacity(s, pid)) : 0;
+  const cash0 = budget; budget += mortCash;
   const c = JSON.parse(JSON.stringify({ blocks: s.blocks, settings: s.settings, participants: s.participants, boardConfig: s.boardConfig }));
   const steps = [];
   const unm = [];
@@ -334,7 +340,9 @@ export function buildPlan(s, pid, P, budgetOverride) {
     }
     if (cost > 0) sets.push({ name: groupName(g), cost, gainPerRound: Math.round(gain), payback: gain > 0 ? Math.ceil(cost / gain) : null });
   }
-  return { steps, sets, budget: Math.max(0, me.money - bReserve), reserve: bReserve, maxLevel: Math.round(prB.maxLevel), mortgagedInSets: unm.map((i) => s.blocks[i].name) };
+  const spent = steps.reduce((x, st) => x + st.cost, 0);
+  const mortgageFor = mortCash && spent > Math.max(0, cash0) ? Math.round(spent - Math.max(0, cash0)) : 0;
+  return { steps, sets, budget: Math.max(0, me.money - bReserve), reserve: bReserve, maxLevel: Math.round(prB.maxLevel), mortgagedInSets: unm.map((i) => s.blocks[i].name), mortgageFor };
 }
 
 export function debtPlan(s, pid, P) {
@@ -364,7 +372,7 @@ export function debtPlan(s, pid, P) {
 export function jailAdvice(s, pid) {
   if (!inPrison(s, pid)) return null;
   const st = stage(s);
-  const oppDanger = s.blocks.some((b) => b.ownerId && b.ownerId !== pid && (b.level || 0) >= 2);
+  const oppDanger = s.blocks.some((b) => b.ownerId && b.ownerId !== pid && (b.level || 0) >= PR(s).jailDanger);
   const hasPardon = ['treasure', 'surprise'].some((d) => s.bonusCards?.[d]?.pardonCardHolderId === pid);
   const me = s.participants.find((p) => p.id === pid);
   const leave = st.unownedShare > PR(s).jailU && !oppDanger;

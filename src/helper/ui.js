@@ -197,7 +197,8 @@ export function createUI(version) {
       h += `<div class="card"><div class="ttl"><span>Будинки (вільно ${money(m.build.budget)})</span><span>запас ${money(m.build.reserve)}</span></div>
         ${m.build.sets.map((g) => `<div class="kv"><span>${esc(g.name)} до 3 буд.</span><span>−${money(g.cost)} · +${money(g.gainPerRound)}/коло · ~${g.payback ?? '—'} кіл</span></div>`).join('')}
         ${order ? `<div class="mut">Порядок зараз: ${order}</div>` : `<div class="mut">Поки бракує грошей на будинок з урахуванням запасу</div>`}
-        <div class="mut">Головне: 3 будинки на кожному місті. Перші будинки окупаються повільно, третій найвигідніший.</div>
+        <div class="mut">${m.build.maxLevel >= 5 ? 'Self-play: будуй до готелю (на richup він коштує як будинок); третій будинок дає найбільший стрибок оренди.' : 'Головне: 3 будинки на кожному місті. Перші будинки окупаються повільно, третій найвигідніший.'}</div>
+        ${m.build.mortgageFor ? `<div class="mut">Self-play: заклади ділянки поза наборами (~${money(m.build.mortgageFor)}), щоб збудувати це вже зараз</div>` : ''}
         ${m.build.mortgagedInSets.length ? `<div class="mut">Спершу викупи заставу: ${esc(m.build.mortgagedInSets.join(', '))}</div>` : ''}</div>`;
       void order;
     }
