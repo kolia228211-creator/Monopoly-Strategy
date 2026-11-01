@@ -29,7 +29,5 @@ console.log(`recorder.min.js: ${code.length} B, bookmarklet: ${bookmarklet.lengt
 
 // Та сама сторінка для claude.ai Artifact (без власного <html>/<head>, з темами)
 const art = await readFile(new URL('tools/install.artifact.html', root), 'utf8');
-await writeFile(new URL('dist/install.artifact.html', root), art
-  .replaceAll('{{VERSION}}', pkg.version)
-  .replaceAll('{{SIZE_KB}}', (bookmarklet.length / 1024).toFixed(1))
-  .replace('{{BOOKMARKLET_JSON}}', JSON.stringify(bookmarklet).replace(/</g, '\\u003c')));
+// сторінка встановлення тепер для помічника (закладка-завантажувач будується в build-helper.mjs)
+export const renderInstall = (bm) => art.replaceAll('{{VERSION}}', pkg.version).replace('{{BOOKMARKLET_JSON}}', JSON.stringify(bm).replace(/</g, '\\u003c'));

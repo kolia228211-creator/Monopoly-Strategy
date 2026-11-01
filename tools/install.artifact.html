@@ -1,8 +1,8 @@
-<title>RichUp Записувач</title>
+<title>RichUp Помічник</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=Manrope:wght@400;600;700&family=JetBrains+Mono&display=swap">
 <style>
-  /* Layout: одна вузька колонка-інструкція, як картка правил гри; кроки — справжня послідовність */
+  /* Layout: одна колонка-інструкція, як картка правил гри; кроки — справжня послідовність */
   :root {
     --bg: #f6f3fb; --surface: #ffffff; --ink: #1d1830; --muted: #6a6386; --line: #e3ddf0;
     --accent: #5b47d6; --accent-ink: #ffffff; --chip: #ece7fa; --ok: #1f8f5f; --warn-bg: #fff4dc; --warn-ink: #7a5300;
@@ -30,59 +30,77 @@
   section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
   h2 { font: 600 16px/1.3 var(--f-display); margin: 0; display: flex; gap: 10px; align-items: center; }
   .n { flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--chip); color: var(--accent); display: grid; place-items: center; font: 700 14px var(--f-display); }
-  ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+  ol, ul { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
   .k { background: var(--chip); border-radius: 6px; padding: 1px 7px; font-weight: 600; white-space: nowrap; }
-  code { font-family: var(--f-mono); background: var(--chip); border-radius: 6px; padding: 1px 6px; font-size: 14px; }
+  code { font-family: var(--f-mono); background: var(--chip); border-radius: 6px; padding: 1px 6px; font-size: 14px; overflow-wrap: anywhere; }
   button { font: 700 16px var(--f-body); background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 13px 16px; width: 100%; cursor: pointer; }
   button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
   button.ok { background: var(--ok); }
-  textarea { width: 100%; height: 88px; background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--line); border-radius: 8px; font: 11px/1.3 var(--f-mono); padding: 8px; resize: vertical; }
+  textarea { width: 100%; height: 76px; background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--line); border-radius: 8px; font: 11px/1.3 var(--f-mono); padding: 8px; resize: vertical; }
   .meta { color: var(--muted); font-size: 13px; margin: 0; font-variant-numeric: tabular-nums; }
   .warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 0; }
   a { color: var(--accent); }
   p { margin: 0; }
+  .feat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+  .feat div { background: var(--chip); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .feat b { display: block; font-size: 14px; }
 </style>
 
 <main>
   <header>
-    <span class="dice">Monopoly-Strategy · крок 1 з 5 · v{{VERSION}}</span>
-    <h1>Записувач гри richup.io</h1>
-    <p class="lead">Записує одну партію, щоб помічник навчився розуміти сайт. Нічого не натискає в грі, токени й паролі маскуються, файл лишається в тебе.</p>
+    <span class="dice">Monopoly-Strategy · v{{VERSION}}</span>
+    <h1>RichUp Помічник</h1>
+    <p class="lead">Панель поверх гри на richup.io з порадами в реальному часі. Вона лише читає стан гри й нічого не натискає за тебе. Оновлюється сама з GitHub.</p>
   </header>
 
   <section>
-    <h2><span class="n">1</span>Скопіюй код</h2>
-    <button id="copy" type="button">Скопіювати код записувача</button>
+    <div class="feat">
+      <div><b>Купувати чи ні</b>цінність ділянки, запас грошей, шанс перемоги в обох варіантах</div>
+      <div><b>Аукціон</b>твоя максимальна ставка і скільки готові дати інші</div>
+      <div><b>Обміни</b>приймати чи ні, максимальна доплата, ідеї обмінів</div>
+      <div><b>Будинки й борги</b>куди будувати першим, що закладати при нестачі грошей</div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">1</span>Скопіюй закладку</h2>
+    <button id="copy" type="button">Скопіювати код помічника</button>
     <textarea id="code" readonly aria-label="Код закладки"></textarea>
-    <p class="meta">Розмір: {{SIZE_KB}} КБ. Якщо кнопка не спрацювала, утримуй палець у полі вище → «Вибрати все» → «Копіювати».</p>
+    <p class="meta">Якщо кнопка не спрацювала: утримуй палець у полі вище → «Вибрати все» → «Копіювати».</p>
   </section>
 
   <section>
     <h2><span class="n">2</span>Створи закладку в Chrome</h2>
     <ol>
-      <li>Відкрий будь-яку сторінку в Chrome → <span class="k">⋮</span> → <span class="k">☆</span>, щоб додати закладку.</li>
-      <li>Відкрий <span class="k">⋮ → Закладки</span>, утримуй щойно додану закладку → <b>Змінити</b>.</li>
-      <li>Назва: <code>RU</code>. Поле <b>URL</b> очисти повністю, встав скопійований код і збережи.</li>
+      <li>Відкрий будь-яку сторінку → <span class="k">⋮</span> → <span class="k">☆</span>, щоб додати закладку.</li>
+      <li><span class="k">⋮ → Закладки</span>, утримуй щойно додану закладку → <b>Змінити</b>.</li>
+      <li>Назва: <code>RU</code>. Поле <b>URL</b> очисти й встав скопійований код. Збережи.</li>
     </ol>
+    <p class="meta">Якщо в тебе вже є закладка <code>RU</code> від записувача, просто заміни в ній URL.</p>
   </section>
 
   <section>
-    <h2><span class="n">3</span>Запиши партію</h2>
+    <h2><span class="n">3</span>Запусти в грі</h2>
     <ol>
-      <li>Зайди в кімнату на richup.io, бажано ще до натискання «Start Game».</li>
-      <li>Торкнися адресного рядка, набери <code>RU</code> і вибери закладку із зірочкою, а не пошук Google.</li>
-      <li>Унизу ліворуч з'явиться панелька <b>● REC</b>. Грай як зазвичай. Найкорисніше, щоб у партії були купівля, аукціон, обмін, будинки, іпотека й тюрма.</li>
-      <li>Наприкінці натисни 💾, щоб зберегти файл, або 📤, щоб поділитися ним. Надішли файл у чат Claude.</li>
+      <li>Зайди в кімнату на richup.io.</li>
+      <li>Торкнися адресного рядка, набери <code>RU</code> і вибери закладку із зірочкою.</li>
+      <li>Знизу з'явиться шторка «🎲 Помічник». Торкнися заголовка, щоб згорнути або розгорнути її.</li>
     </ol>
-    <p class="warn">Не оновлюй сторінку під час запису: дані живуть до перезавантаження. Якщо панелька зникла, просто запусти закладку ще раз.</p>
+    <p class="warn">Після оновлення сторінки запусти закладку ще раз. Помічник щоразу бере найновішу версію з GitHub.</p>
   </section>
 
   <section>
-    <h2><span class="n">4</span>На комп'ютері</h2>
-    <p>Те саме: створи закладку з назвою <code>RU</code>, встав код у поле адреси й натискай її на сторінці гри.</p>
+    <h2><span class="n">4</span>На комп'ютері: розширення</h2>
+    <p>Закладка працює і на ПК. А розширення запускається само на кожній сторінці richup:</p>
+    <ol>
+      <li>Завантаж ZIP репозиторію: <a href="https://github.com/kolia228211-creator/Monopoly-Strategy/archive/refs/heads/main.zip" target="_blank" rel="noopener">Monopoly-Strategy-main.zip</a> і розпакуй.</li>
+      <li>Відкрий <code>chrome://extensions</code>, увімкни <b>Режим розробника</b> (праворуч угорі).</li>
+      <li><b>Завантажити розпаковане</b> → вибери папку <code>extension</code> всередині розпакованого архіву.</li>
+    </ol>
+    <p class="meta">Розширення саме підтягує свіжу версію з GitHub, тож перевстановлювати його не треба. Панель на ПК можна перетягувати за заголовок.</p>
   </section>
 
-  <p class="meta">Відкритий код: <a href="https://github.com/kolia228211-creator/Monopoly-Strategy" target="_blank" rel="noopener">github.com/kolia228211-creator/Monopoly-Strategy</a></p>
+  <p class="meta">Код відкритий: <a href="https://github.com/kolia228211-creator/Monopoly-Strategy" target="_blank" rel="noopener">github.com/kolia228211-creator/Monopoly-Strategy</a></p>
 </main>
 
 <script>

@@ -35,5 +35,11 @@ const manifest = {
   icons: { 128: 'icon128.png' }
 };
 await writeFile(new URL('extension/manifest.json', root), JSON.stringify(manifest, null, 2) + '\n');
+const bmText = 'javascript:' + encodeURIComponent('void ' + loaderMin);
+const art = await readFile(new URL('tools/install.artifact.html', root), 'utf8');
+const page = art.replaceAll('{{VERSION}}', pkg.version).replace('{{BOOKMARKLET_JSON}}', JSON.stringify(bmText).replace(/</g, '\\u003c'));
+await writeFile(new URL('dist/install.artifact.html', root), page);
+// GitHub Pages: та сама сторінка з повним HTML-скелетом
+await writeFile(new URL('docs/index.html', root), '<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + page.replace(/<\/style>/, 'body{margin:0}</style>').replace(/(<\/style>)/, '$1</head><body>') + '</body></html>');
 const size = (await readFile(new URL('dist/helper.js', root))).length;
 console.log(`helper.js: ${(size / 1024).toFixed(1)} KB, extension/ оновлено`);
