@@ -1,4 +1,4 @@
-var __FALLBACK__ = chrome.runtime.getURL('helper.js');
+var __FALLBACK__ = document.documentElement.getAttribute('data-ru-fallback');
 // Завантажувач помічника: бере НАЙСВІЖІШИЙ коміт з GitHub і підключає dist/helper.js.
 // Джерела по черзі: jsDelivr@коміт → GitHub raw@коміт → jsDelivr@main → GitHub raw@main → вбудована копія (розширення).
 // Код завантажується через fetch і вставляється в сторінку (richup.io не має CSP), тож кеш CDN не заважає.

@@ -9,7 +9,7 @@ const CDN = 'https://cdn.jsdelivr.net/gh/kolia228211-creator/Monopoly-Strategy@m
 const banner = `/* RichUp Помічник v${pkg.version} — https://github.com/kolia228211-creator/Monopoly-Strategy */`;
 await build({
   entryPoints: [new URL('src/helper/main.js', root).pathname],
-  bundle: true, format: 'iife', target: 'es2020', minify: true, charset: 'utf8',
+  bundle: true, format: 'iife', target: 'es2020', minify: true, charset: 'ascii',
   define: { __VERSION__: JSON.stringify(pkg.version) },
   banner: { js: banner },
   outfile: new URL('dist/helper.js', root).pathname
@@ -24,13 +24,19 @@ await writeFile(new URL('dist/helper.bookmarklet.txt', root), 'javascript:' + en
 // Розширення Chrome (Manifest V3): завантажувач + локальна копія як запасний варіант
 await mkdir(new URL('extension/', root), { recursive: true });
 await copyFile(new URL('dist/helper.js', root), new URL('extension/helper.js', root));
-await writeFile(new URL('extension/loader.js', root), `var __FALLBACK__ = chrome.runtime.getURL('helper.js');\n` + loaderSrc);
+// 1) ізольований світ, document_start: кладе в DOM адресу вбудованої копії (у MAIN-світі chrome.runtime недоступний)
+await writeFile(new URL('extension/fallback-url.js', root), "document.documentElement.setAttribute('data-ru-fallback', chrome.runtime.getURL('helper.js'));\n");
+// 2) MAIN-світ сторінки: той самий завантажувач, що й у закладці
+await writeFile(new URL('extension/loader.js', root), "var __FALLBACK__ = document.documentElement.getAttribute('data-ru-fallback');\n" + loaderSrc);
 const manifest = {
   manifest_version: 3,
   name: 'RichUp Помічник',
   version: pkg.version,
   description: 'Поради в реальному часі для richup.io: купівля, аукціон, обміни, будинки, шанси на перемогу.',
-  content_scripts: [{ matches: ['https://richup.io/*'], js: ['loader.js'], run_at: 'document_idle' }],
+  content_scripts: [
+    { matches: ['https://richup.io/*'], js: ['fallback-url.js'], run_at: 'document_start' },
+    { matches: ['https://richup.io/*'], js: ['loader.js'], world: 'MAIN', run_at: 'document_idle' }
+  ],
   web_accessible_resources: [{ resources: ['helper.js'], matches: ['https://richup.io/*'] }],
   icons: { 128: 'icon128.png' }
 };
