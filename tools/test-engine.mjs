@@ -49,6 +49,16 @@ ok('аукціон за останню ділянку набору: ставит
 s = makeState(); own(s, 'p0', ['Frankfurt', 'Munich', 'Berlin']); s.participants[0].money = 1200; s.currentPlayerIndex = 0;
 a = analyze(s, 'p0');
 ok('план будинків рівномірний і не більше бюджету', a.build.steps.length >= 3 && a.build.steps.reduce((x, y) => x + y.cost, 0) <= 1200, a.build.steps.map((x) => `${x.name} ${x.from}→${x.to}`).join(', '));
+// Нема готівки на будинок, але можна закласти ділянку поза набором: порада так і каже
+s = makeState(); own(s, 'p0', ['Frankfurt', 'Munich', 'Berlin', 'Lyon', 'Venice']); s.participants[0].money = 37; s.currentPlayerIndex = 0;
+a = analyze(s, 'p0');
+ok('мало готівки, але є застава: заголовок «Заклади … → збудуй …»', a.now.kind === 'build' && /^Заклади .*→ збудуй/.test(a.now.title) && a.build.first.picks.length >= 1, a.now.title);
+s.blocks.find((b) => b.name === 'Lyon').isMortgaged = true; s.blocks.find((b) => b.name === 'Venice').isMortgaged = true;
+a = analyze(s, 'p0');
+ok('нічого закладати й нема грошей: не радить будувати', !(a.now.kind === 'build'), a.now.title);
+s = makeState(); own(s, 'p0', ['Frankfurt', 'Munich', 'Berlin']); s.participants[0].money = 1200; s.currentPlayerIndex = 0;
+a = analyze(s, 'p0');
+ok('вистачає готівки: просто «Будуй»', /^Будуй:/.test(a.now.title), a.now.title);
 
 // 8. Борг
 s = makeState(); own(s, 'p0', ['Frankfurt', 'Munich', 'Berlin', 'Salvador']); ['Frankfurt', 'Munich', 'Berlin'].forEach((n) => s.blocks[idxOf(s, n)].level = 2); s.participants[0].money = -180;

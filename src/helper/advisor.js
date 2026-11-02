@@ -349,9 +349,27 @@ export function buildPlan(s, pid, P, budgetOverride) {
     }
     if (cost > 0) sets.push({ name: groupName(g), cost, gainPerRound: Math.round(gain), payback: gain > 0 ? Math.ceil(cost / gain) : null });
   }
+  // Перший крок потребує застави? Тоді називаємо, що саме закласти (найменша втрата оренди на долар застави)
+  let first = null;
+  if (steps.length) {
+    const need = Math.round(steps[0].cost - Math.max(0, cash0));
+    first = { name: steps[0].name, from: steps[0].from, to: steps[0].to, cost: steps[0].cost, need: Math.max(0, need), picks: [] };
+    if (mortCash && need > 0) {
+      const cand = [];
+      s.blocks.forEach((b, i) => {
+        if (!canMortgage(s, i, pid)) return;
+        if (b.type === 'city' && setOwner(s, b.countryId) === pid) return;
+        cand.push({ idx: i, name: b.name, cash: b.price / 2, loss: P[i] * (rentFor(s, i, 7) || rentAt(b, 0) || 25) / (b.price / 2) });
+      });
+      cand.sort((x, y) => x.loss - y.loss);
+      let got = 0;
+      for (const c0 of cand) { if (got >= need) break; first.picks.push({ idx: c0.idx, name: c0.name, cash: Math.round(c0.cash) }); got += c0.cash; }
+      if (got < need) first.picks = [];
+    }
+  }
   const spent = steps.reduce((x, st) => x + st.cost, 0);
   const mortgageFor = mortCash && spent > Math.max(0, cash0) ? Math.round(spent - Math.max(0, cash0)) : 0;
-  return { steps, sets, budget: Math.max(0, me.money - bReserve), reserve: bReserve, maxLevel: Math.round(prB.maxLevel), mortgagedInSets: unm.map((i) => s.blocks[i].name), mortgageFor };
+  return { steps, first, sets, budget: Math.max(0, me.money - bReserve), reserve: bReserve, maxLevel: Math.round(prB.maxLevel), mortgagedInSets: unm.map((i) => s.blocks[i].name), mortgageFor };
 }
 
 export function debtPlan(s, pid, P) {
@@ -438,7 +456,12 @@ export function analyze(s, pid, profileOf = null) {
   else if (out.trades.some((t) => t.role === 'incoming')) { const t = out.trades.find((x) => x.role === 'incoming'); out.now = { kind: 'trade', title: `Обмін від ${t.from}: ${t.text}`, tone: t.verdict === 'accept' ? 'good' : t.verdict === 'reject' ? 'bad' : 'neutral' }; }
   else if (out.buy) out.now = { kind: 'buy', title: out.buy.text, tone: out.buy.verdict === 'buy' ? 'good' : out.buy.verdict === 'cant' ? 'bad' : 'neutral' };
   else if (out.jail) out.now = { kind: 'jail', title: out.jail.text, tone: 'neutral' };
-  else if (myTurn && out.build.steps.length) out.now = { kind: 'build', title: `Будуй: ${out.build.steps[0].name} (${out.build.steps[0].from}→${out.build.steps[0].to})`, tone: 'good' };
+  else if (myTurn && out.build.steps.length) {
+    const st0 = out.build.steps[0], f = out.build.first;
+    out.now = f && f.picks.length
+      ? { kind: 'build', title: `Заклади ${f.picks.map((x) => `${x.name} (+$${x.cash})`).join(', ')} → збудуй ${st0.name} (${st0.from}→${st0.to})`, tone: 'good' }
+      : { kind: 'build', title: `Будуй: ${st0.name} (${st0.from}→${st0.to})`, tone: 'good' };
+  }
   else if (myTurn) out.now = { kind: 'turn', title: s.cubesRolledInTurn ? 'Можна завершувати хід' : 'Кидай кубики', tone: 'neutral' };
   else out.now = { kind: 'wait', title: `Хід: ${cur ? cur.name : '…'}`, tone: 'neutral' };
   return out;

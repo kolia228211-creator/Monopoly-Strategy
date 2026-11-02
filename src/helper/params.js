@@ -195,7 +195,101 @@ export const TUNED = {
   }
  }
 };
+// Налаштування під розмір столу (кількість гравців : x2 оренда). Перевірено на свіжих партіях в обох рушіях:
+// 3 гравці x2 ON, 4 гравці x2 ON, 6 гравців x2 OFF. Для решти комбінацій окреме налаштування нічого не дало.
+export const BY_SIZE = {
+ "3:1": {
+  "stageEarly": 0.895,
+  "stageLate": 1.465,
+  "H": 24.71,
+  "complete": 1.125,
+  "step": 0.456,
+  "block": 0.361,
+  "air": 0.995,
+  "buyMin": 0.606,
+  "resBase": 42.374,
+  "resLate": 6.44,
+  "aucMult": 1.867,
+  "aucKeep": 16.797,
+  "bRes": 27.472,
+  "bResGrow": 0.139,
+  "maxLevel": 5,
+  "unmortCash": 728.472,
+  "jailU": 0.053,
+  "trade": 0.723,
+  "buyShare": 1.311,
+  "swapPay": 1.215,
+  "deny": 1.837,
+  "acceptMargin": 74.764,
+  "buildCashLots": 1.636,
+  "openMult": 1.198,
+  "floorInSwap": 0,
+  "jailDanger": 5,
+  "mortForBuild": 1
+ },
+ "4:1": {
+  "stageEarly": 1.106,
+  "stageLate": 1.463,
+  "H": 17.897,
+  "complete": 1.452,
+  "step": 0.565,
+  "block": 0.492,
+  "air": 0.999,
+  "buyMin": 0.603,
+  "resBase": 54.721,
+  "resLate": 67.085,
+  "aucMult": 1.847,
+  "aucKeep": 77.65,
+  "bRes": 3.518,
+  "bResGrow": 3.409,
+  "maxLevel": 5,
+  "unmortCash": 712.832,
+  "jailU": 0.07,
+  "trade": 0.651,
+  "buyShare": 1.477,
+  "swapPay": 1.63,
+  "deny": 1.714,
+  "acceptMargin": 89.941,
+  "buildCashLots": 0.223,
+  "openMult": 1.586,
+  "floorInSwap": 0,
+  "jailDanger": 5,
+  "mortForBuild": 1
+ },
+ "6:0": {
+  "stageEarly": 0.897,
+  "stageLate": 1.551,
+  "H": 12.025,
+  "complete": 1.027,
+  "step": 0.245,
+  "block": 0.514,
+  "air": 0.081,
+  "buyMin": 0.21,
+  "resBase": 21.032,
+  "resLate": 66.442,
+  "aucMult": 2.06,
+  "aucKeep": 48.202,
+  "bRes": 25.113,
+  "bResGrow": 1.459,
+  "maxLevel": 5,
+  "unmortCash": 511.55,
+  "jailU": 0.072,
+  "trade": 0.87,
+  "buyShare": 1.39,
+  "swapPay": 0.853,
+  "deny": 1.565,
+  "acceptMargin": -37.791,
+  "buildCashLots": 0.708,
+  "openMult": 1.402,
+  "floorInSwap": 0,
+  "jailDanger": 1,
+  "mortForBuild": 1
+ }
+};
 export function paramsFor(s) {
-  const t = s && s.settings && s.settings.payDoubleRentWhenOwnFullSet ? TUNED.dbl1 : TUNED.dbl0;
-  return t ? { ...BASE, ...t } : BASE;
+  const dbl = s && s.settings && s.settings.payDoubleRentWhenOwnFullSet ? 1 : 0;
+  const t = dbl ? TUNED.dbl1 : TUNED.dbl0;
+  const n = s && s.participants ? s.participants.length : 0;
+  const z = BY_SIZE[n + ':' + dbl];
+  return t ? { ...BASE, ...t, ...(z || {}) } : BASE;
 }
