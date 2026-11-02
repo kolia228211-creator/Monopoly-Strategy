@@ -1,6 +1,6 @@
 // Юніт-тести "мозку" на справжній дошці richup Classic
 import { makeState, own, idxOf } from './mock-state.mjs';
-import { analyze, valueOf, danger, tradeAdvice } from '../src/helper/advisor.js';
+import { analyze, valueOf, danger, tradeAdvice, jailAdvice } from '../src/helper/advisor.js';
 import { rentFor } from '../src/helper/rules.js';
 import { boardProbs } from '../src/helper/probability.js';
 import { winProbs } from '../src/helper/sim.js';
@@ -94,6 +94,10 @@ ok('гравець з Німеччиною на 3 будинках — фаво�
 const s2 = makeState();
 const w2 = winProbs(s2, { n: 300 });
 ok('рівний старт: шанси 15–35% у кожного', Object.values(w2.base).every((v) => v > 0.12 && v < 0.38), Object.values(w2.base).map((v) => Math.round(v * 100) + '%').join(', '));
+
+// Тюрма: вільно багато ділянок -> виходь, навіть якщо в суперників є будинки
+{ let t = makeState(); own(t, 'p1', ['Frankfurt', 'Munich', 'Berlin']); t.blocks.find((b) => b.name === 'Munich').level = 3; t.participants[0].position = 10; t.blocks[10].suspendedTurnsRemaining = { p0: 3 }; t.currentPlayerIndex = 0;
+  const ja = jailAdvice(t, 'p0'); ok('тюрма: багато вільних ділянок -> платити й виходити попри чужі будинки', ja && ja.verdict === 'pay', ja && ja.text); }
 
 if (fails) { console.log(`\n${fails} FAIL`); process.exit(1); } else console.log('\nУсе пройдено');
 

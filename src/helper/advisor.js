@@ -402,9 +402,10 @@ export function jailAdvice(s, pid) {
   const oppDanger = s.blocks.some((b) => b.ownerId && b.ownerId !== pid && (b.level || 0) >= PR(s).jailDanger);
   const hasPardon = ['treasure', 'surprise'].some((d) => s.bonusCards?.[d]?.pardonCardHolderId === pid);
   const me = s.participants.find((p) => p.id === pid);
-  const leave = st.unownedShare > PR(s).jailU && !oppDanger;
+  // jailFree: коли вільно багато ділянок (>30%), чужі будинки не причина сидіти (симуляції: різниці немає, а гра активніша)
+  const leave = st.unownedShare > PR(s).jailU && (!oppDanger || st.unownedShare > (PR(s).jailFree ?? 0.3));
   if (leave) return { verdict: hasPardon ? 'pardon' : 'pay', text: hasPardon ? 'Використай Pardon і виходь' : `Плати $${PRISON_FEE} і виходь: ще є що купувати`, reasons: [`вільних ділянок ${Math.round(st.unownedShare * 100)}% (поріг ${Math.round(PR(s).jailU * 100)}%)`] };
-  return { verdict: 'stay', text: 'Сиди й кидай на дубль: у тюрмі безпечніше', reasons: [oppDanger ? 'у суперників є будинки' : 'майже все розкуплено', me && me.money < 200 ? 'мало грошей' : ''].filter(Boolean) };
+  return { verdict: 'stay', text: 'Сиди й кидай на дубль: у тюрмі безпечніше', reasons: [oppDanger ? 'у суперників є будинки, а вільних ділянок лише ' + Math.round(st.unownedShare * 100) + '%' : 'майже все розкуплено', me && me.money < 200 ? 'мало грошей' : ''].filter(Boolean) };
 }
 
 export function playersSummary(s, pid) {

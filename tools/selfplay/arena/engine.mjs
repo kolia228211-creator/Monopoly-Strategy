@@ -62,7 +62,7 @@ export function toInternal(pr) {
     resBase: pr.resBase, resLate: pr.resLate, auctionMult: pr.aucMult, auctionKeep: pr.aucKeep,
     tradeP: pr.trade, buyerT: pr.buyShare, openMult: pr.openMult ?? 1.5, tradeOtherW: pr.deny, tradeAccept: pr.acceptMargin, floorT: pr.deny,
     floorInSwap: pr.floorInSwap ?? 1, swapBalance: 0.5 * pr.swapPay, swapCashKeep: 100, buildCashLots: Math.max(0.5, pr.buildCashLots),
-    jailLeaveUnowned: pr.jailU, jailDangerLevel: pr.jailDanger ?? 2, jailMinCash: 100,
+    jailLeaveUnowned: pr.jailU, jailDangerLevel: pr.jailDanger ?? 2, jailFree: pr.jailFree ?? 9, jailMinCash: 100,
     bRes: pr.bRes, bResGrow: pr.bResGrow, buildMaxLevel: Math.round(pr.maxLevel), unmortCash: pr.unmortCash, unmortMult: 0.55,
     mortForBuild: pr.mortForBuild ?? 0, avoid: pr.avoid, buyAll: pr.buyAll, tradeOn: pr.tradeOn, swapOn: pr.swapOn, cashBuyOn: pr.cashBuyOn
   };
@@ -537,7 +537,7 @@ function jailDecision(G, p) {
     if (hasPardon(G, p)) return 'pardon';
     return G.money[p] > 150 && (unownedShare(G) > 0.1 || G.R() < 0.5) ? 'pay' : 'roll';
   }
-  const leave = unownedShare(G) > b.jailLeaveUnowned && !oppDanger(G, p, b.jailDangerLevel);
+  const leave = unownedShare(G) > b.jailLeaveUnowned && (!oppDanger(G, p, b.jailDangerLevel) || unownedShare(G) > b.jailFree);
   if (!leave) return 'roll';
   if (hasPardon(G, p)) return 'pardon';
   return G.money[p] > PRISON_FEE + b.jailMinCash ? 'pay' : 'roll';
