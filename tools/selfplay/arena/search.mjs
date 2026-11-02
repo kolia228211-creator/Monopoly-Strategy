@@ -15,6 +15,7 @@ const dbl = +arg('dbl', 0), GENS = +arg('gens', 30), GAMES = +arg('games', 1500)
 const OUT = arg('out', `tools/selfplay/out/arena-dbl${dbl}.json`), SIGMA0 = +arg('sigma', 0.18), SEED = +arg('seed', 1);
 const VAL = +arg('val', 3000), RESUME = arg('resume', null), ROBUST = arg('robust', '0') === '1';
 // --robust 1: фітнес = середнє двох рушіїв (арена + evolve.mjs) — стійкість до моделі суперників
+const SIZES = arg('sizes', '3,4,5,6').split(',').map(Number); // --sizes 3 : окремий пошук під один розмір столу
 const MIX = { human: 0.4, def: 0.2, hof: 0.4 };
 const START = arg('start', 'tuned') === 'base' ? V04 : V050(dbl);
 
@@ -41,17 +42,17 @@ if (RESUME && existsSync(RESUME)) {
 }
 
 // контроль: проти людиноподібних + v0.5.0 (те, що зараз у помічнику)
-const valOpts = { from: 9_000_000, to: 9_000_000 + VAL, dbl, mix: { human: 0.5, def: 0.5, hof: 0 }, sizes: [3, 4, 5, 6], defBot: V050(dbl) };
+const valOpts = { from: 9_000_000, to: 9_000_000 + VAL, dbl, mix: { human: 0.5, def: 0.5, hof: 0 }, sizes: SIZES, defBot: V050(dbl) };
 async function fit(cand, opts) {
   const a = await pool.evalRange(cand, opts);
   if (!ROBUST) return a;
-  const e = await pool.evalRange(cand, { ...opts, engine: 'evolve', hof: opts.hof ? opts.hof.slice(-3) : [] });
+  const e = await pool.evalRange(cand, { ...opts, sizes: SIZES, engine: 'evolve', hof: opts.hof ? opts.hof.slice(-3) : [] });
   return { mean: (a.mean + e.mean) / 2, se: Math.hypot(a.se, e.se) / 2, fa: a.mean, fe: e.mean };
 }
 async function valFit(cand) {
   const a = await pool.evalRange(cand, valOpts);
   if (!ROBUST) return a;
-  const e = await pool.evalRange(cand, { from: valOpts.from, to: valOpts.to, dbl, engine: 'evolve', hof: [V050(dbl)] });
+  const e = await pool.evalRange(cand, { from: valOpts.from, to: valOpts.to, dbl, sizes: SIZES, engine: 'evolve', hof: [V050(dbl)] });
   return { mean: (a.mean + e.mean) / 2, se: Math.hypot(a.se, e.se) / 2, fa: a.mean, fe: e.mean };
 }
 const t0 = Date.now();
@@ -69,7 +70,7 @@ for (let gen = gen0; gen < gen0 + GENS; gen++) {
     const x = m.map((mi, d) => Math.min(1, Math.max(0, mi + sigma * Math.sqrt(C[d]) * z[d])));
     pop.push({ x });
   }
-  const opts = { from: 100_000 + gen * GAMES, to: 100_000 + (gen + 1) * GAMES, dbl, mix: MIX, hof };
+  const opts = { from: 100_000 + gen * GAMES, to: 100_000 + (gen + 1) * GAMES, dbl, mix: MIX, hof, sizes: SIZES };
   const res = await Promise.all(pop.map((c) => fit(decode(c.x), opts)));
   pop.forEach((c, k) => { c.f = res[k].mean; c.se = res[k].se; c.fa = res[k].fa; c.fe = res[k].fe; });
   pop.sort((a, b) => b.f - a.f);

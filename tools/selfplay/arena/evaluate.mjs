@@ -38,12 +38,12 @@ export function evaluate(cand, { from, to, dbl, vacCash = true, mix, sizes, hof,
 import { makeState } from '../../mock-state.mjs';
 import { makeBoard, playGame as playOld, humanLike, DEFAULT as OLD_DEFAULT } from '../engine.mjs';
 let OB = null;
-export function evaluateEvolve(cand, { from, to, dbl, hof = [], humanOnly = false }) {
+export function evaluateEvolve(cand, { from, to, dbl, hof = [], humanOnly = false, sizes = [3, 4, 5, 6] }) {
   OB = OB || makeBoard(makeState());
   const poolB = humanOnly ? ['human'] : [OLD_DEFAULT, 'human', 'human', ...hof];
   let score = 0, sq = 0, wins = 0, games = 0; const by = {};
   for (let s = from; s < to; s++) {
-    const R = rng(s * 2246822519 + 777), n = [3, 4, 5, 6][s % 4], seat = Math.floor(R() * n);
+    const R = rng(s * 2246822519 + 777), n = sizes[s % sizes.length], seat = Math.floor(R() * n);
     const ps = Array.from({ length: n - 1 }, () => { const x = poolB[Math.floor(R() * poolB.length)]; return x === 'human' ? humanLike(R) : x; });
     ps.splice(seat, 0, cand);
     const r = playOld(OB, ps, s * 11 + 5, { dbl: !!dbl });
